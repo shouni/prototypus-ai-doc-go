@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"prototypus-ai-doc-go/internal/poster"
 
 	"github.com/spf13/cobra"
 
@@ -16,6 +17,7 @@ var (
 	inputFile  string
 	outputFile string
 	mode       string
+	postAPI    bool
 )
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
@@ -88,6 +90,25 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if err := writeOutput(outputFile, generatedScript); err != nil {
 		return fmt.Errorf("出力ファイルへの書き込みに失敗しました: %w", err)
 	}
+
+	// 4. API投稿オプションの処理
+	if postAPI {
+		// タイトルとして出力ファイル名またはモードを使用
+		title := outputFile
+		if title == "" {
+			title = fmt.Sprintf("標準出力モード (%s)", mode)
+		}
+
+		fmt.Fprintln(os.Stderr, "外部APIに投稿中...")
+		if err := poster.PostToAPI(title, mode, generatedScript); err != nil {
+			// API投稿エラーは致命的ではない場合が多いため、警告に留める
+			fmt.Fprintf(os.Stderr, "警告: 外部APIへの投稿に失敗しました: %v\n", err)
+		} else {
+			fmt.Fprintln(os.Stderr, "外部APIへの投稿が完了しました。")
+		}
+	}
+
+	return nil
 
 	return nil
 }
