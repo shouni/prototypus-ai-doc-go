@@ -2,6 +2,7 @@ package voicevox
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,11 +13,40 @@ import (
 	"time"
 )
 
+// 話者タグの定数定義
+const (
+	SpeakerTagZundamon = "[ずんだもん]"
+	SpeakerTagMetan    = "[めたん]"
+)
+
 // StyleIDMappings は、キャラクター名からVOICEVOXの話者スタイルIDへのマッピングです。
 var StyleIDMappings = map[string]int{
-	"[ずんだもん]": 3, // ずんだもん (ノーマル)
-	"[めたん]":   2, // 四国めたん (ノーマル)
+	SpeakerTagZundamon: 3, // ずんだもん (ノーマル)
+	SpeakerTagMetan:    2, // 四国めたん (ノーマル)
 }
+
+// WAVヘッダーのマジックナンバーの定数化
+const (
+	// WAV/RIFF チャンク
+	RiffChunkIDSize    = 4                                                 // "RIFF"
+	RiffChunkSizeField = 4                                                 // File Size (全体のサイズ - 8)
+	WaveIDSize         = 4                                                 // "WAVE"
+	WavRiffHeaderSize  = RiffChunkIDSize + RiffChunkSizeField + WaveIDSize // 12 bytes
+
+	// FMT チャンク
+	FmtChunkIDSize    = 4                                                     // "fmt "
+	FmtChunkSizeField = 4                                                     // fmt Chunk Size (16 for PCM)
+	FmtChunkDataSize  = 16                                                    // Format Tag, Channels, SampleRate, etc.
+	WavFmtChunkSize   = FmtChunkIDSize + FmtChunkSizeField + FmtChunkDataSize // 24 bytes
+
+	// DATA チャンク
+	DataChunkIDSize    = 4                                    // "data"
+	DataChunkSizeField = 4                                    // Data Size (データ本体のサイズ)
+	WavDataHeaderSize  = DataChunkIDSize + DataChunkSizeField // 8 bytes
+
+	// 合計ヘッダーサイズ: 12 + 24 + 8 = 44 bytes
+	WavTotalHeaderSize = WavRiffHeaderSize + WavFmtChunkSize + WavDataHeaderSize
+)
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成します。
 func PostToEngine(scriptContent string, outputWavFile string) error {
@@ -59,20 +89,20 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 			return fmt.Errorf("オーディオクエリPOSTリクエスト作成失敗: %w", err)
 		}
 
-		resp, err := client.Do(req)
+		// --- 修正箇所 ---
+		resp, err := client.Do(req) // ★ resp の定義
 		if err != nil {
 			return fmt.Errorf("オーディオクエリAPI呼び出し失敗: %w", err)
 		}
+		defer resp.Body.Close() // ★ 定義直後に defer を配置
 
 		if resp.StatusCode != http.StatusOK {
-			// APIがエラーを返す場合、レスポンスボディを読むとデバッグに役立つ
+			// APIがエラーを返す場合、レスポンスボディを読む
 			errorBody, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
 			return fmt.Errorf("オーディオクエリAPIがエラーを返しました: Status %d, Body: %s", resp.StatusCode, string(errorBody))
 		}
 
 		queryBody, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
 		if err != nil {
 			return fmt.Errorf("オーディオクエリボディの読み込み失敗: %w", err)
 		}
@@ -87,15 +117,16 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 		if err != nil {
 			return fmt.Errorf("音声合成API呼び出し失敗: %w", err)
 		}
+		defer synthResp.Body.Close() // ★ 定義直後に defer を配置
 
 		if synthResp.StatusCode != http.StatusOK {
 			errorBody, _ := io.ReadAll(synthResp.Body)
-			synthResp.Body.Close()
+			// 手動の synthResp.Body.Close() は defer のため削除
 			return fmt.Errorf("音声合成APIがエラーを返しました: Status %d, Body: %s", synthResp.StatusCode, string(errorBody))
 		}
 
 		wavData, err := io.ReadAll(synthResp.Body)
-		synthResp.Body.Close()
+		// 手動の synthResp.Body.Close() は defer のため削除
 		if err != nil {
 			return fmt.Errorf("音声合成結果の読み込み失敗: %w", err)
 		}
@@ -155,56 +186,54 @@ func parseScript(script string) []scriptSegment {
 }
 
 // combineWavData は複数の完全なWAVバイトデータを結合し、一つのWAVファイルを返します。
-// VOICEVOXが出力する標準的なWAV構造に依存した簡易連結処理です。
+// VOICEVOXが出力する標準的なWAV構造（例: PCM、44.1kHz、16bit、モノラル）に依存した簡易連結処理です。
 func combineWavData(wavFiles [][]byte) ([]byte, error) {
 	var rawData []byte
 	totalDataSize := uint32(0)
 
-	// WAVヘッダーのサイズ (RIFF ID, File Size, WAVE ID, FMT ID, FMT Size, FMT Contents)
-	const HeaderSize = 44
-
 	// 最初のファイルからフォーマット情報（最初の36バイト）を取得
-	if len(wavFiles[0]) < HeaderSize-8 { // 36バイト
-		return nil, fmt.Errorf("最初のWAVファイルのヘッダーが短すぎます")
+	fmtChunkEndIndex := WavRiffHeaderSize + WavFmtChunkSize
+	if len(wavFiles[0]) < fmtChunkEndIndex {
+		return nil, fmt.Errorf("最初のWAVファイルのヘッダー（RIFF + FMT）が短すぎます")
 	}
-	formatHeader := wavFiles[0][0 : HeaderSize-8]
+	formatHeader := wavFiles[0][0:fmtChunkEndIndex] // 最初の36バイト (RIFFヘッダー + FMTチャンク)
 
 	for _, wavBytes := range wavFiles {
-		if len(wavBytes) < HeaderSize {
-			return nil, fmt.Errorf("WAVファイルがデータチャンクを含んでいません")
+		if len(wavBytes) < WavTotalHeaderSize {
+			return nil, fmt.Errorf("WAVファイルが完全なヘッダーを含んでいません")
 		}
 
 		// Dataチャンクのサイズを取得 (バイト40-43)
-		dataSize := uint32(wavBytes[40]) | uint32(wavBytes[41])<<8 | uint32(wavBytes[42])<<16 | uint32(wavBytes[43])<<24
+		dataSizeStartIndex := WavTotalHeaderSize - DataChunkSizeField // 40バイト目
+		dataSize := binary.LittleEndian.Uint32(wavBytes[dataSizeStartIndex:WavTotalHeaderSize])
 
 		// dataチャンクの内容を取得 (44バイト目からデータサイズ分)
-		dataChunk := wavBytes[44 : 44+dataSize]
+		dataChunk := wavBytes[WavTotalHeaderSize : WavTotalHeaderSize+dataSize]
 
 		rawData = append(rawData, dataChunk...)
 		totalDataSize += dataSize
 	}
 
 	// 新しいWAVファイルを構築
-	combinedWav := make([]byte, HeaderSize+totalDataSize)
+	combinedWav := make([]byte, WavTotalHeaderSize+totalDataSize)
 	copy(combinedWav, formatHeader) // 最初の36バイト (RIFF, WAVE, FMTチャンク) をコピー
 
 	// "data" チャンクの識別子とサイズを書き込む (バイト36から)
-	copy(combinedWav[36:], []byte("data"))
-	combinedWav[40] = byte(totalDataSize)
-	combinedWav[41] = byte(totalDataSize >> 8)
-	combinedWav[42] = byte(totalDataSize >> 16)
-	combinedWav[43] = byte(totalDataSize >> 24)
+	dataIDStartIndex := WavRiffHeaderSize + WavFmtChunkSize // 36バイト目
+	copy(combinedWav[dataIDStartIndex:], []byte("data"))
+
+	// Data Chunk Size (バイト40-43)を更新
+	dataSizeStartIndex := WavTotalHeaderSize - DataChunkSizeField // 40バイト目
+	binary.LittleEndian.PutUint32(combinedWav[dataSizeStartIndex:WavTotalHeaderSize], totalDataSize)
 
 	// ファイル全体のサイズを更新 (バイト4から)
-	// FileSize = 44 (ヘッダー) + totalDataSize - 8 (RIFFチャンクのIDとサイズ分)
-	fileSize := HeaderSize + totalDataSize - 8
-	combinedWav[4] = byte(fileSize)
-	combinedWav[5] = byte(fileSize >> 8)
-	combinedWav[6] = byte(fileSize >> 16)
-	combinedWav[7] = byte(fileSize >> 24)
+	// FileSize = WavTotalHeaderSize + totalDataSize - 8 (RIFF IDとFileSizeフィールドの8バイトを引く)
+	fileSize := WavTotalHeaderSize + totalDataSize - WavRiffHeaderSize + RiffChunkSizeField
+	fileSizeStartIndex := RiffChunkIDSize // 4バイト目
+	binary.LittleEndian.PutUint32(combinedWav[fileSizeStartIndex:fileSizeStartIndex+RiffChunkSizeField], fileSize)
 
 	// 結合したデータをコピー (バイト44から)
-	copy(combinedWav[44:], rawData)
+	copy(combinedWav[WavTotalHeaderSize:], rawData)
 
 	return combinedWav, nil
 }
