@@ -3,21 +3,23 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/spf13/cobra"
 	"io"
 	"os"
-	"prototypus-ai-doc-go/internal/poster"
-
-	"github.com/spf13/cobra"
 
 	"prototypus-ai-doc-go/internal/ai"
+	"prototypus-ai-doc-go/internal/ioutils"
+	"prototypus-ai-doc-go/internal/poster"
+	"prototypus-ai-doc-go/internal/voicevox"
 )
 
 // generateCmd のフラグ変数を定義
 var (
-	inputFile  string
-	outputFile string
-	mode       string
-	postAPI    bool
+	inputFile      string
+	outputFile     string
+	mode           string
+	postAPI        bool
+	voicevoxOutput string
 )
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
@@ -46,13 +48,17 @@ func init() {
 	generateCmd.Flags().StringVarP(&outputFile, "output-file", "o", "",
 		"生成されたスクリプトの出力ファイル名 (例: out/script.md)。省略時は標準出力 (stdout) に出力します。")
 
-	// -m, --mode フラグ (PersistentFlagsはroot.goで定義済みですが、ここではコマンド固有のフラグとして再定義することも可能です)
-	// ただし、今回はroot.goで定義した 'model' を利用し、このコマンドではナレーションモードを定義します
+	// -m, --mode フラグ
 	generateCmd.Flags().StringVarP(&mode, "mode", "m", "dialogue",
 		"スクリプト生成モードを指定: 'dialogue' (ずんだもん/めたん対話) または 'solo' (ずんだもんモノローグ)")
 
+	// -p, --post-api フラグ
 	generateCmd.Flags().BoolVarP(&postAPI, "post-api", "p", false,
 		"生成されたスクリプトを外部APIに投稿します (環境変数 POST_API_URL が必要)。")
+
+	// -v, --voicevox フラグの定義
+	generateCmd.Flags().StringVarP(&voicevoxOutput, "voicevox", "v", "",
+		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
 }
 
 // runGenerate は generate コマンドの実行ロジックです。
@@ -72,7 +78,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, model, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
-	// ★ 修正点1: NewClient を使用してクライアントを初期化
+	// NewClient を使用してクライアントを初期化
 	aiClient, err := ai.NewClient(context.Background(), model)
 	if err != nil {
 		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
@@ -84,9 +90,27 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
 
-	// 3. 結果を出力先へ書き出す
-	// generatedScript を使用しているため、未使用エラーが解消されます
-	if err := writeOutput(outputFile, generatedScript); err != nil {
+	// 生成されたスクリプトを標準エラー出力に進捗メッセージとして表示
+	fmt.Fprintln(os.Stderr, "\n--- AI スクリプト生成結果 ---")
+	fmt.Fprintln(os.Stderr, generatedScript)
+	fmt.Fprintln(os.Stderr, "------------------------------------")
+
+	// 3. VOICEVOX出力の処理
+	if voicevoxOutput != "" {
+		// VOICEVOX出力が指定されている場合、合成処理を実行
+		fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", voicevoxOutput)
+
+		if err := voicevox.PostToEngine(generatedScript, voicevoxOutput); err != nil {
+			return fmt.Errorf("VOICEVOX音声合成に失敗しました: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, "VOICEVOXによる音声合成が完了し、ファイルに保存されました。")
+
+		// 音声ファイルが出力されたため、ここで処理を終了
+		return nil
+	}
+
+	// 4. 通常のI/O出力 (voicevoxOutput が空の場合のみ実行)
+	if err := ioutils.WriteOutput(outputFile, generatedScript); err != nil {
 		return fmt.Errorf("出力ファイルへの書き込みに失敗しました: %w", err)
 	}
 
