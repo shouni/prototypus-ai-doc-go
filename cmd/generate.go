@@ -89,23 +89,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("出力ファイルへの書き込みに失敗しました: %w", err)
 	}
 
-	// 4. Slack通知オプションの処理
-	//if notifySlack {
-	//	// タイトルとして出力ファイル名またはモードを使用
-	//	title := outputFile
-	//	if title == "" {
-	//		title = fmt.Sprintf("標準出力モード (%s)", mode)
-	//	}
-	//
-	//	fmt.Println("Slackに通知中...")
-	//	// generatedScript を使用しているため、未使用エラーが解消されます
-	//	if err := output.NotifySlack(title, generatedScript); err != nil {
-	//		fmt.Printf("警告: Slack通知に失敗しました: %v\n", err)
-	//	} else {
-	//		fmt.Println("Slack通知が完了しました。")
-	//	}
-	//}
-
 	return nil
 }
 

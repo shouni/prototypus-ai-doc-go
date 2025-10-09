@@ -1,6 +1,6 @@
 module prototypus-ai-doc-go
 
-go 1.25
+go 1.24.0
 
 require (
 	github.com/google/generative-ai-go v0.20.1
