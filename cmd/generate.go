@@ -3,9 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
 	"io"
 	"os"
+
+	"github.com/spf13/cobra"
 
 	"prototypus-ai-doc-go/internal/ai"
 	"prototypus-ai-doc-go/internal/ioutils"
@@ -63,6 +64,11 @@ func init() {
 
 // runGenerate は generate コマンドの実行ロジックです。
 func runGenerate(cmd *cobra.Command, args []string) error {
+
+	if voicevoxOutput != "" && outputFile != "" {
+		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください。")
+	}
+
 	// 1. 入力元から文章を読み込む
 	inputContent, err := readInput(inputFile)
 	if err != nil {
