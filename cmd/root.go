@@ -53,8 +53,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&model, "model", "", "gemini-2.5-flash",
 		"使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
 
-	// generate コマンドをルートに追加（generate.goで定義します）
-	// TODO: rootCmd.AddCommand(generateCmd) を generate.go で定義後に有効化
+	// generate コマンドをルートに追加（ここを追加・修正）
+	rootCmd.AddCommand(generateCmd)
 }
 
 // -----------------------------------------------------------------
