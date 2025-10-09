@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"prototypus-ai-doc-go/pkg/ai"
 )
 
 // generateCmd のフラグ変数を定義
@@ -56,25 +59,52 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// 1. 入力元から文章を読み込む
 	inputContent, err := readInput(inputFile)
 	if err != nil {
-		return err
+		// ファイル読み込み失敗時にエラーメッセージを表示
+		return fmt.Errorf("入力ファイルの読み込みに失敗しました: %w", err)
 	}
 
-	// 2. 読み込んだ文章をAIに渡す（この部分は次のステップで実装）
-	fmt.Printf("--- 入力成功 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, model, len(inputContent))
+	// 入力チェックを強化
+	if len(inputContent) == 0 {
+		return fmt.Errorf("エラー: 入力コンテンツが空です。文章を入力してください")
+	}
+
+	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, model, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
-	// ----------------------------------------------------
-	// TODO: pkg/ai/client.go のロジックを呼び出す
-	// generatedScript, err := ai.GenerateScript(inputContent, mode, model)
-	// if err != nil { return err }
-	// ----------------------------------------------------
-
-	// 3. 結果を出力先へ書き出す（現在はテスト用のメッセージを出力）
-	testScript := fmt.Sprintf("# 生成スクリプト（テスト出力）\n\n[ずんだもん] %sモードで文章を解析したのだ！\n\n[めたん] 入力コンテンツのサイズは %d バイトでしたわ！", mode, len(inputContent))
-
-	if err := writeOutput(outputFile, testScript); err != nil {
-		return err
+	// ★ 修正点1: NewClient を使用してクライアントを初期化
+	aiClient, err := ai.NewClient(model)
+	if err != nil {
+		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
+	defer aiClient.Close() // ★ 修正点2: クライアントを確実に閉じる
+
+	generatedScript, err := aiClient.GenerateScript(context.Background(), inputContent, mode)
+	if err != nil {
+		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
+	}
+
+	// 3. 結果を出力先へ書き出す
+	// generatedScript を使用しているため、未使用エラーが解消されます
+	if err := writeOutput(outputFile, generatedScript); err != nil {
+		return fmt.Errorf("出力ファイルへの書き込みに失敗しました: %w", err)
+	}
+
+	// 4. Slack通知オプションの処理
+	//if notifySlack {
+	//	// タイトルとして出力ファイル名またはモードを使用
+	//	title := outputFile
+	//	if title == "" {
+	//		title = fmt.Sprintf("標準出力モード (%s)", mode)
+	//	}
+	//
+	//	fmt.Println("Slackに通知中...")
+	//	// generatedScript を使用しているため、未使用エラーが解消されます
+	//	if err := output.NotifySlack(title, generatedScript); err != nil {
+	//		fmt.Printf("警告: Slack通知に失敗しました: %v\n", err)
+	//	} else {
+	//		fmt.Println("Slack通知が完了しました。")
+	//	}
+	//}
 
 	return nil
 }
