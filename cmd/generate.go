@@ -38,8 +38,6 @@ func init() {
 	// generateCmd をルートコマンドに追加
 	rootCmd.AddCommand(generateCmd)
 
-	// generateCmd 固有のフラグを定義
-
 	// -i, --input-file フラグ
 	generateCmd.Flags().StringVarP(&inputFile, "input-file", "i", "",
 		"元となる文章が書かれたファイルのパス。省略時は標準入力 (stdin) を使用します。")
@@ -53,7 +51,8 @@ func init() {
 	generateCmd.Flags().StringVarP(&mode, "mode", "m", "dialogue",
 		"スクリプト生成モードを指定: 'dialogue' (ずんだもん/めたん対話) または 'solo' (ずんだもんモノローグ)")
 
-	// TODO: Slack通知フラグを後で追加
+	generateCmd.Flags().BoolVarP(&postAPI, "post-api", "p", false,
+		"生成されたスクリプトを外部APIに投稿します (環境変数 POST_API_URL が必要)。")
 }
 
 // runGenerate は generate コマンドの実行ロジックです。
@@ -107,8 +106,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(os.Stderr, "外部APIへの投稿が完了しました。")
 		}
 	}
-
-	return nil
 
 	return nil
 }
