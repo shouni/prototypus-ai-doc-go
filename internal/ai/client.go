@@ -7,9 +7,10 @@ import (
 	"os"
 	"text/template"
 
+	"prototypus-ai-doc-go/internal/prompt" // 組み込みプロンプトを取得
+
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
-	"prototypus-ai-doc-go/internal/prompt" // 組み込みプロンプトを取得
 )
 
 // Client はGemini APIとの通信を管理します。
@@ -18,8 +19,8 @@ type Client struct {
 	modelName string
 }
 
-// NewClient はGeminiClientを初期化します。
-func NewClient(modelName string) (*Client, error) {
+// NewClient はGeminiClientを初期化します。ctxを引数に追加
+func NewClient(ctx context.Context, modelName string) (*Client, error) {
 	// 1. APIキーの取得
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
@@ -27,8 +28,8 @@ func NewClient(modelName string) (*Client, error) {
 	}
 
 	// 2. クライアントの作成
-	// NewClientはContextを受け取らない形式に戻します。
-	client, err := genai.NewClient(context.Background(), option.WithAPIKey(apiKey))
+	// ctx を genai.NewClient に渡す
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}

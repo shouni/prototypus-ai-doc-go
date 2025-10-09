@@ -72,7 +72,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
 	// ★ 修正点1: NewClient を使用してクライアントを初期化
-	aiClient, err := ai.NewClient(model)
+	aiClient, err := ai.NewClient(context.Background(), model)
 	if err != nil {
 		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
