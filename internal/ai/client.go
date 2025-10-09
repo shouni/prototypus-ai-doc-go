@@ -89,12 +89,13 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 
 	candidate := resp.Candidates[0]
 
-	// ... (ブロック理由のチェックなど、提供コードのエラーハンドリングを続行)
+	if candidate.FinishReason != genai.FinishReasonUnspecified && candidate.FinishReason != genai.FinishReasonStop {
+		// FinishReasonStop (正常終了) 以外の理由で停止した場合
+		return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %s", candidate.FinishReason.String())
+	}
 
+	// その後、コンテンツの有無をチェック
 	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-		if candidate.FinishReason != genai.FinishReasonUnspecified {
-			return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %s", candidate.FinishReason.String())
-		}
 		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
 	}
 

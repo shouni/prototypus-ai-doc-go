@@ -92,15 +92,26 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// 4. API投稿オプションの処理
 	if postAPI {
-		// タイトルとして出力ファイル名またはモードを使用
 		title := outputFile
 		if title == "" {
-			title = fmt.Sprintf("標準出力モード (%s)", mode)
+			const maxLen = 50
+			inputStr := string(inputContent)
+
+			// 入力コンテンツの冒頭を使用
+			if len(inputStr) > 0 {
+				preview := inputStr
+				if len(inputStr) > maxLen {
+					preview = inputStr[:maxLen] + "..."
+				}
+				title = fmt.Sprintf("Generated Script (Stdin): %s", preview)
+			} else {
+				// 入力が空の場合は、モードをタイトルにする
+				title = fmt.Sprintf("Generated Script (Empty Input) - Mode: %s", mode)
+			}
 		}
 
 		fmt.Fprintln(os.Stderr, "外部APIに投稿中...")
 		if err := poster.PostToAPI(title, mode, generatedScript); err != nil {
-			// API投稿エラーは致命的ではない場合が多いため、警告に留める
 			fmt.Fprintf(os.Stderr, "警告: 外部APIへの投稿に失敗しました: %v\n", err)
 		} else {
 			fmt.Fprintln(os.Stderr, "外部APIへの投稿が完了しました。")
