@@ -4,104 +4,106 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/shouni/git-gemini-reviewer-go)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🚀 概要 (About) - 文章を「ずんだもん」と「めたん」の台本に変える AI スクリプトジェネレーター
+## 🚀 `README.md` 更新案
 
-**`prototypus-ai-doc-go`** は、**Google Gemini の強力なAI**を活用し、通常の文章（記事、企画書、箇条書きなど）を、人気キャラクター **「ずんだもん」** と **「めたん」** の対話形式のナレーションスクリプトへ自動変換するコマンドラインツールです。
+以下に、追加された機能に対応し、利用方法が明確になるように更新した `README.md` の内容案をご提案します。
 
-このツールを使えば、コンテンツクリエイターやチームは、文章の校正や推敲にかかる時間を短縮し、**音声コンテンツ制作の最初の壁**を飛び越えることができます。AIが生成するスクリプトは、**話者（ずんだもん/めたん）や感情**がマークダウンで明確に示されており、音声合成ソフトや声優への指示出しが容易になります。
+特に、**VOICEVOX連携**と**新しいI/Oオプション**の部分を強調しています。
 
-### 🌸 導入がもたらすポジティブな変化
+### `README.md` (更新案)
 
-| メリット | 制作チームへの影響 | 期待される効果                                          |
-| :--- | :--- |:-------------------------------------------------|
-| **コンテンツ制作の劇的なスピードアップ** | **「台本作成」の手間が激減します。** 長文や企画書から、ナレーションに最適な会話形式のスクリプトを即座に生成します。 | 動画制作、eラーニング、ポッドキャストなどの**コンテンツ供給量**が大幅に増加します。     |
-| **キャラクター性の維持と明確化** | **「誰が、どんなトーンで話すか」が明確になります。** AIがプロンプトに従って話者と感情タグを付与するため、キャラクターの個性が際立つスクリプトが得られます。 | 制作物の**統一されたブランドイメージ**が維持され、音声コンテンツの質が向上します。      |
-| **多様な出力と連携** | **「スクリプトの活用方法」を自由に選べます。** 標準出力、ファイル保存、**外部連携APIへの投稿**など、チームのワークフローに合わせた最適な方法でスクリプトを受け取れます。 | **自動で次の工程**（データベース、専用ツールなど） へデータを引き渡すことが可能になります。 |
+````markdown
+# Prototypus AI Doc Go
 
------
+**Prototypus AI Doc Go** は、Google Gemini API を使用して、開発ドキュメントや技術記事などの長い文章を、対話形式またはモノローグ形式のナレーションスクリプトに変換するための CLI ツールです。
 
-## ✨ 技術スタック (Technology Stack)
+## ✨ 主な機能
 
-| 要素 | 技術 / ライブラリ | 役割 |
+1.  **AIによる自動スクリプト生成**: 長文を対話（ずんだもん・四国めたん）またはモノローグ（ずんだもん）形式のスクリプトに変換します。
+2.  **VOICEVOX連携（NEW!）**: 生成されたスクリプトをローカルで起動しているVOICEVOXエンジンに送信し、**連結された一つのWAV音声ファイル**として出力できます。
+3.  **柔軟なI/O**: ファイル入力/出力、標準入力/出力、そして外部APIへの投稿に対応しています。
+4.  **高い保守性**: Goのベストプラクティスに基づき、AI、I/O、VOICEVOX処理などのロジックが `internal` パッケージに分離されています。
+
+---
+
+## 📦 使い方
+
+### 1. 環境設定
+
+ツールを実行する前に、以下の環境変数を設定してください。
+
+| 変数名 | 必須/任意 | 説明 |
 | :--- | :--- | :--- |
-| **言語** | **Go (Golang)** | ツールの開発言語。クロスプラットフォームでの高速な実行を実現します。 |
-| **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）やサブコマンド構造の構築に使用します。 |
-| **AI モデル** | **Google Gemini API** | 入力された文章を分析し、指定された形式のナレーションスクリプトを生成するために使用します。 |
-| **プロンプト管理** | **`//go:embed`** | プロンプトテンプレートをビルド時に実行ファイル内に埋め込み、管理を容易にします。 |
-| **連携サービス** | 標準 `net/http` | 生成されたスクリプトを**任意の外部API**にJSON形式で投稿するために使用します。 |
+| `GEMINI_API_KEY` | 必須 | Google AI Studio で取得した Gemini API キー。 |
+| `VOICEVOX_API_URL` | VOICEVOX使用時必須 | ローカルで起動しているVOICEVOXエンジンのURL。 (例: `http://localhost:50021`) |
+| `POST_API_URL` | 外部API投稿時必須 | スクリプトを投稿する外部APIのエンドポイント。 |
+
+### 2. スクリプト生成コマンド
+
+メインコマンドは `generate` です。
+
+```bash
+prototypus-ai-doc generate [flags]
+````
+
+#### フラグ一覧
+
+| フラグ | 短縮形 | 説明 |
+| :--- | :--- | :--- |
+| `--input-file` | `-i` | 元となる文章ファイル (`.txt` や `.md`) のパス。省略時は標準入力を使用。 |
+| `--output-file` | `-o` | 生成されたスクリプトを保存するファイル名。省略時は標準出力に出力。 |
+| `--mode` | `-m` | スクリプトの形式: `dialogue` (対話) または `solo` (モノローグ)。(Default: `dialogue`) |
+| `--voicevox` | `-v` | **(新機能)** 生成されたスクリプトをVOICEVOXで合成し、指定されたファイル名 (`.wav`) で保存します。**他の出力フラグと同時に指定できません。** |
+| `--post-api` | `-p` | 生成されたスクリプトを `POST_API_URL` に投稿します。 |
 
 -----
 
-## 🛠️ 事前準備と環境設定
+## 🔊 VOICEVOX連携の実行例
 
-### 1\. Go のインストール
+### 目的: この `README.md` を入力として使用し、対話スクリプトを生成、そして音声化する。
 
-本ツールは Go言語で開発されています。Goが未インストールの場合は、[公式ドキュメント](https://go.dev/doc/install) を参照し、環境に合わせたインストールを行ってください。
+まず、この README ファイルを `README.md` として保存されていると仮定します。
 
-### 2\. プロジェクトのセットアップとビルド
+#### 1\. VOICEVOXエンジンを起動し、環境変数を設定
 
 ```bash
-# リポジトリをクローン (仮定)
-git clone git@github.com:YOUR_GITHUB_USER/prototypus-ai-doc-go.git
-cd prototypus-ai-doc-go
+# VOICEVOXを起動後、URLを設定
+export VOICEVOX_API_URL="http://localhost:50021"
+export GEMINI_API_KEY="AIzaSy...your-key...021"
+```
 
-# 実行ファイルを bin/ ディレクトリに生成
-go build -o bin/prototypus-ai-doc
+#### 2\. コマンド実行
+
+**入力ファイル (`-i`)** として自身の `README.md` を指定し、**VOICEVOX出力 (`-v`)** を `readme_audio.wav` に指定します。
+
+```bash
+# README.md の内容を元に対話スクリプトを生成し、WAVファイルを出力
+./bin/prototypus-ai-doc generate \
+    -i README.md \
+    -m dialogue \
+    -v readme_audio.wav
+```
+
+#### 実行結果 (ターミナル出力)
+
+```
+ファイルから読み込み中: README.md
+--- 処理開始 ---
+モード: dialogue
+モデル: gemini-2.5-flash
+...（入力サイズなどの情報）...
+
+AIによるスクリプト生成を開始します...
+
+--- AI スクリプト生成完了 ---
+VOICEVOXエンジンに接続し、音声合成を開始します (出力: readme_audio.wav)...
+VOICEVOXによる音声合成が完了し、ファイルに保存されました。
+
+# 現在のディレクトリに readme_audio.wav が生成されます。
 ```
 
 -----
 
-### 3\. 環境変数の設定 (必須)
+### 📜 ライセンス (License)
 
-本ツールは Google Gemini API を利用するため、APIキーの設定が必要です。
-
-```bash
-# APIキーを環境変数に設定
-export GEMINI_API_KEY="YOUR_API_KEY_HERE"
-
-# (外部API投稿機能を使用する場合)
-export POST_API_URL="https://your.custom.endpoint/script_receiver"
-```
-
------
-
-## 💻 使い方 (Usage)
-
-基本的なコマンドは `generate` です。
-
-```bash
-./bin/prototypus-ai-doc generate [OPTIONS]
-```
-
-### コマンドとフラグ一覧
-
-| コマンド | フラグ | ショートカット | 説明 |
-| :--- | :--- | :--- | :--- |
-| `generate` | `--input-file` | `-i` | 元となる文章が書かれたファイルのパス。省略時は標準入力 (stdin) を使用します。 |
-| | `--output-file` | `-o` | 生成されたスクリプトの出力ファイル名 (例: `out/script.md`)。省略時は標準出力に出力します。 |
-| | `--mode` | `-m` | スクリプト生成モード: **`dialogue`** (ずんだもん/めたん対話, デフォルト) または **`solo`** (ずんだもんモノローグ)。 |
-| | `--model` | (なし) | 使用する Gemini モデル名 (例: `gemini-2.5-flash`, `gemini-2.5-pro`)。デフォルトは `gemini-2.5-flash` です。 |
-| | `--post-api` | `-p` | 生成されたスクリプトを外部APIに投稿します（`POST_API_URL` 環境変数が必要）。 |
-
-### 実行例
-
-#### 1\. 標準的な対話モード (ファイル入力 & 標準出力)
-
-```bash
-# test_input.txt の内容を読み込み、対話スクリプトを生成し、ターミナルに出力
-./bin/prototypus-ai-doc generate -i test_input.txt -m dialogue
-```
-
-#### 2\. モノローグモード (標準入力 & ファイル出力)
-
-```bash
-# コマンドに直接パイプした内容をモノローグスクリプトに変換し、ファイルに出力
-echo "環境変数の設定はセキュリティ上重要です" | ./bin/prototypus-ai-doc generate -m solo -o out/solo_script.md
-```
-
-#### 3\. 外部APIへの投稿
-
-```bash
-# スクリプトを生成し、同時に環境変数 POST_API_URL で指定されたエンドポイントに投稿
-./bin/prototypus-ai-doc generate -i test_input.txt -m dialogue -p
-```
+このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
