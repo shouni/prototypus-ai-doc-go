@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
-	"prototypus-ai-doc-go/pkg/prompt" // 組み込みプロンプトを取得
+	"prototypus-ai-doc-go/internal/prompt" // 組み込みプロンプトを取得
 )
 
 // Client はGemini APIとの通信を管理します。

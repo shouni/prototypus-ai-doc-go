@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"prototypus-ai-doc-go/pkg/ai"
+	"prototypus-ai-doc-go/internal/ai"
 )
 
 // generateCmd のフラグ変数を定義
