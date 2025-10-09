@@ -4,15 +4,6 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/shouni/git-gemini-reviewer-go)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🚀 `README.md` 更新案
-
-以下に、追加された機能に対応し、利用方法が明確になるように更新した `README.md` の内容案をご提案します。
-
-特に、**VOICEVOX連携**と**新しいI/Oオプション**の部分を強調しています。
-
-### `README.md` (更新案)
-
-````markdown
 # Prototypus AI Doc Go
 
 **Prototypus AI Doc Go** は、Google Gemini API を使用して、開発ドキュメントや技術記事などの長い文章を、対話形式またはモノローグ形式のナレーションスクリプトに変換するための CLI ツールです。
