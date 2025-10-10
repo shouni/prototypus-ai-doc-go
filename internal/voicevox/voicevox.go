@@ -77,7 +77,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 
 	// タイムアウトを設定したHTTPクライアント
 	client := &http.Client{
-		Timeout: 180 * time.Second,
+		Timeout: 180 * time.Second, // 合成処理は時間がかかるため、長めに設定
 	}
 
 	segments := parseScript(scriptContent)
@@ -143,28 +143,18 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 		return err // 発生した最初のエラーを返す
 	}
 
-	// 結果を元の順序で並べ替える
-	// 結果を一時スライスに格納
-	results := make([]resultSegment, 0, len(segments))
-	for res := range resultsChan {
-		results = append(results, res)
-	}
-
-	// indexに基づいてソート
-	// (簡略化のため、結果スライスをセグメント数と同じサイズで初期化し、indexを使って直接格納する方がより効率的)
-	if len(results) != len(segments) {
-		// エラー処理などでスキップされたセグメントがある可能性を考慮
-	}
-
-	// 最終的な音声データのリストを作成
+	// ★ 修正箇所: 結果を元の順序で並べ替える
+	// 結果を一時スライスに格納する代わりに、直接正しいインデックスに格納
 	orderedAudioDataList := make([][]byte, len(segments))
-	for _, res := range results {
-		// parseScriptで抽出され、かつAPIコールが成功したセグメントの結果のみを元のインデックス位置に配置
-		orderedAudioDataList[res.index] = res.wavData
+	for res := range resultsChan {
+		// parseScriptで抽出され、かつAPIコールが成功したセグメントの結果を元のインデックス位置に配置
+		if res.index >= 0 && res.index < len(segments) { // 範囲チェックを追加
+			orderedAudioDataList[res.index] = res.wavData
+		}
 	}
 
 	// APIコールがスキップされ、orderedAudioDataListの要素がnilになっているものを除外
-	finalAudioDataList := make([][]byte, 0, len(results))
+	finalAudioDataList := make([][]byte, 0, len(segments))
 	for _, data := range orderedAudioDataList {
 		if data != nil {
 			finalAudioDataList = append(finalAudioDataList, data)
