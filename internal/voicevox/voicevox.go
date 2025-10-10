@@ -287,7 +287,9 @@ func runSynthesis(client *http.Client, apiURL string, queryBody []byte, styleID 
 
 func parseScript(script string) []scriptSegment {
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
-	reEmotion := regexp.MustCompile(`\[.+?\]`)
+	reEmotion := regexp.MustCompile(
+		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
+	)
 
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
