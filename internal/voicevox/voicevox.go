@@ -10,47 +10,58 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
 
-// 話者タグの定数定義
+// ----------------------------------------------------------------------
+// 話者タグとVOICEVOXスタイルタグの定数定義 (変更なし)
+// ----------------------------------------------------------------------
+
 const (
 	SpeakerTagZundamon = "[ずんだもん]"
 	SpeakerTagMetan    = "[めたん]"
 )
 
-// StyleIDMappings は、キャラクター名からVOICEVOXの話者スタイルIDへのマッピングです。
+const (
+	VvTagNormal  = "[通常]"
+	VvTagHappy   = "[喜び]"
+	VvTagAngry   = "[怒り]"
+	VvTagWhisper = "[ささやき]"
+)
+
 var StyleIDMappings = map[string]int{
-	SpeakerTagZundamon: 3, // ずんだもん (ノーマル)
-	SpeakerTagMetan:    2, // 四国めたん (ノーマル)
+	SpeakerTagZundamon + VvTagNormal:  3,
+	SpeakerTagZundamon + VvTagHappy:   1,
+	SpeakerTagZundamon + VvTagAngry:   4,
+	SpeakerTagZundamon + VvTagWhisper: 18,
+	SpeakerTagMetan + VvTagNormal:     2,
+	SpeakerTagMetan + VvTagHappy:      15,
+	SpeakerTagMetan + VvTagAngry:      17,
 }
 
-// WAVヘッダーのマジックナンバーの定数化 (変更なし)
+// ----------------------------------------------------------------------
+// 定数 (WAVヘッダー) (変更なし)
+// ----------------------------------------------------------------------
+
 const (
-	// WAV/RIFF チャンク
 	RiffChunkIDSize    = 4
 	RiffChunkSizeField = 4
 	WaveIDSize         = 4
 	WavRiffHeaderSize  = RiffChunkIDSize + RiffChunkSizeField + WaveIDSize // 12 bytes
-
-	// FMT チャンク
-	FmtChunkIDSize    = 4
-	FmtChunkSizeField = 4
-	FmtChunkDataSize  = 16
-	WavFmtChunkSize   = FmtChunkIDSize + FmtChunkSizeField + FmtChunkDataSize // 24 bytes
-
-	// DATA チャンク
+	FmtChunkIDSize     = 4
+	FmtChunkSizeField  = 4
+	FmtChunkDataSize   = 16
+	WavFmtChunkSize    = FmtChunkIDSize + FmtChunkSizeField + FmtChunkDataSize // 24 bytes
 	DataChunkIDSize    = 4
 	DataChunkSizeField = 4
 	WavDataHeaderSize  = DataChunkIDSize + DataChunkSizeField // 8 bytes
-
-	// 合計ヘッダーサイズ: 12 + 24 + 8 = 44 bytes
 	WavTotalHeaderSize = WavRiffHeaderSize + WavFmtChunkSize + WavDataHeaderSize
 )
 
 // ----------------------------------------------------------------------
-// 並列処理用の構造体
+// 並列処理用の構造体 (変更なし)
 // ----------------------------------------------------------------------
 
 type scriptSegment struct {
@@ -58,14 +69,13 @@ type scriptSegment struct {
 	Text       string
 }
 
-// resultSegment は並列処理の結果を、元の順序（index）とともに保持します。
 type resultSegment struct {
 	index   int
 	wavData []byte
 }
 
 // ----------------------------------------------------------------------
-// メイン処理 (並列化済み)
+// メイン処理 (リトライロジック追加)
 // ----------------------------------------------------------------------
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成します。
@@ -75,85 +85,133 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 		return fmt.Errorf("VOICEVOX_API_URL 環境変数が設定されていません")
 	}
 
-	// タイムアウトを設定したHTTPクライアント
 	client := &http.Client{
-		Timeout: 180 * time.Second, // 合成処理は時間がかかるため、長めに設定
+		Timeout: 90 * time.Second,
 	}
 
 	segments := parseScript(scriptContent)
 	if len(segments) == 0 {
-		return fmt.Errorf("スクリプトから有効なセグメントを抽出できませんでした")
+		return fmt.Errorf("スクリプトから有効なセグメントを抽出できませんでした。AIの出力形式が [話者タグ][スタイルタグ] テキスト の形式に沿っているか確認してください")
 	}
 
-	// 並列処理のためのセットアップ
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(segments))
 	resultsChan := make(chan resultSegment, len(segments))
 
-	// ★ 同時実行数 5 のセマフォを定義
-	const maxConcurrency = 5
+	// 並列実行数を15に設定
+	const maxConcurrency = 15
 	semaphore := make(chan struct{}, maxConcurrency)
+
+	// リトライ設定の定義
+	const maxRetries = 3
+	const retryDelay = 2 * time.Second
 
 	for i, seg := range segments {
 		if seg.Text == "" {
 			continue
 		}
 
-		// セマフォにトークンが書き込まれるまで待機（同時実行数を制限）
 		semaphore <- struct{}{}
 		wg.Add(1)
 
 		go func(i int, seg scriptSegment) {
 			defer wg.Done()
-			defer func() { <-semaphore }() // 処理終了時にトークンを解放
+			defer func() { <-semaphore }()
 
+			// スタイルIDの検索とフォールバック処理
 			styleID, ok := StyleIDMappings[seg.SpeakerTag]
+
 			if !ok {
-				errChan <- fmt.Errorf("話者タグ %s に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, i)
-				return
+				reSpeaker := regexp.MustCompile(`^(\[.+?\])`)
+				speakerMatch := reSpeaker.FindStringSubmatch(seg.SpeakerTag)
+
+				if len(speakerMatch) < 2 {
+					errChan <- fmt.Errorf("話者タグ %s の解析に失敗しました (セグメント %d)", seg.SpeakerTag, i)
+					return
+				}
+
+				baseSpeakerTag := speakerMatch[1]
+				fallbackKey := baseSpeakerTag + VvTagNormal
+
+				defaultStyleID, defaultOk := StyleIDMappings[fallbackKey]
+
+				if defaultOk {
+					styleID = defaultStyleID
+					fmt.Printf("警告: スタイルタグ %s が見つかりません。デフォルトの %s にフォールバックします (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
+				} else {
+					errChan <- fmt.Errorf("話者・スタイルタグ %s (およびデフォルトの %s) に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, fallbackKey, i)
+					return
+				}
 			}
 
-			// 1. オーディオクエリ (audio_query) の作成
-			queryBody, err := runAudioQuery(client, apiURL, seg.Text, styleID)
-			if err != nil {
-				errChan <- fmt.Errorf("セグメント %d のオーディオクエリ失敗: %w", i, err)
-				return
+			// リトライロジックの追加
+			var queryBody []byte
+			var wavData []byte
+			var currentErr error
+
+			// 処理が成功するまで最大 maxRetries 回試行
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				// 1. オーディオクエリ (audio_query) の作成
+				queryBody, currentErr = runAudioQuery(client, apiURL, seg.Text, styleID)
+				if currentErr != nil {
+					// 最終試行でなければリトライ
+					if attempt < maxRetries {
+						// エラーメッセージのログ出力（テキストが長すぎないように制御）
+						textSnippet := seg.Text
+						if len(textSnippet) > 20 {
+							textSnippet = textSnippet[:20] + "..."
+						}
+						fmt.Printf("警告: セグメント %d (テキスト: \"%s\") のオーディオクエリでエラー。%d/%d 回目のリトライを %v 後に実行します: %v\n", i, textSnippet, attempt, maxRetries, retryDelay, currentErr)
+						time.Sleep(retryDelay)
+						continue
+					}
+					// 最終試行で失敗
+					errChan <- fmt.Errorf("セグメント %d のオーディオクエリが連続失敗: %w", i, currentErr)
+					return
+				}
+
+				// 2. 音声合成 (synthesis) の実行
+				wavData, currentErr = runSynthesis(client, apiURL, queryBody, styleID)
+				if currentErr != nil {
+					// 最終試行でなければリトライ
+					if attempt < maxRetries {
+						textSnippet := seg.Text
+						if len(textSnippet) > 20 {
+							textSnippet = textSnippet[:20] + "..."
+						}
+						fmt.Printf("警告: セグメント %d (テキスト: \"%s\") の音声合成でエラー。%d/%d 回目のリトライを %v 後に実行します: %v\n", i, textSnippet, attempt, maxRetries, retryDelay, currentErr)
+						time.Sleep(retryDelay)
+						continue
+					}
+					// 最終試行で失敗
+					errChan <- fmt.Errorf("セグメント %d の音声合成が連続失敗: %w", i, currentErr)
+					return
+				}
+
+				// 両方の処理が成功したらループを抜ける
+				break
 			}
 
-			// 2. 音声合成 (synthesis) の実行
-			wavData, err := runSynthesis(client, apiURL, queryBody, styleID)
-			if err != nil {
-				errChan <- fmt.Errorf("セグメント %d の音声合成失敗: %w", i, err)
-				return
-			}
-
-			// 順序情報と結果をチャネルに送信
 			resultsChan <- resultSegment{index: i, wavData: wavData}
 
-		}(i, seg) // ループ変数をクロージャに渡す
+		}(i, seg)
 	}
 
-	// すべてのゴルーチンの終了を待つ
 	wg.Wait()
 	close(resultsChan)
 	close(errChan)
 
-	// エラーチェック
 	if err := <-errChan; err != nil {
-		return err // 発生した最初のエラーを返す
+		return err
 	}
 
-	// ★ 修正箇所: 結果を元の順序で並べ替える
-	// 結果を一時スライスに格納する代わりに、直接正しいインデックスに格納
 	orderedAudioDataList := make([][]byte, len(segments))
 	for res := range resultsChan {
-		// parseScriptで抽出され、かつAPIコールが成功したセグメントの結果を元のインデックス位置に配置
-		if res.index >= 0 && res.index < len(segments) { // 範囲チェックを追加
+		if res.index >= 0 && res.index < len(segments) {
 			orderedAudioDataList[res.index] = res.wavData
 		}
 	}
 
-	// APIコールがスキップされ、orderedAudioDataListの要素がnilになっているものを除外
 	finalAudioDataList := make([][]byte, 0, len(segments))
 	for _, data := range orderedAudioDataList {
 		if data != nil {
@@ -165,7 +223,6 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 		return fmt.Errorf("すべてのセグメントの合成に失敗したか、有効なセグメントがありませんでした")
 	}
 
-	// 3. 音声ファイルのマージと保存 (WAV連結処理)
 	combinedWavBytes, err := combineWavData(finalAudioDataList)
 	if err != nil {
 		return fmt.Errorf("WAVデータの結合に失敗しました: %w", err)
@@ -174,11 +231,6 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	return os.WriteFile(outputWavFile, combinedWavBytes, 0644)
 }
 
-// ----------------------------------------------------------------------
-// ヘルパー関数 (API呼び出しを分離)
-// ----------------------------------------------------------------------
-
-// runAudioQuery は /audio_query APIを呼び出し、クエリボディを返します。
 func runAudioQuery(client *http.Client, apiURL string, text string, styleID int) ([]byte, error) {
 	queryURL := fmt.Sprintf("%s/audio_query", apiURL)
 	params := url.Values{}
@@ -209,7 +261,6 @@ func runAudioQuery(client *http.Client, apiURL string, text string, styleID int)
 	return queryBody, nil
 }
 
-// runSynthesis は /synthesis APIを呼び出し、WAVデータを返します。
 func runSynthesis(client *http.Client, apiURL string, queryBody []byte, styleID int) ([]byte, error) {
 	synthURL := fmt.Sprintf("%s/synthesis", apiURL)
 	synthParams := url.Values{}
@@ -234,14 +285,11 @@ func runSynthesis(client *http.Client, apiURL string, queryBody []byte, styleID 
 	return wavData, nil
 }
 
-// ----------------------------------------------------------------------
-// parseScript と combineWavData (変更なし)
-// ----------------------------------------------------------------------
-
-// parseScript はスクリプトから話者タグとテキストを抽出します。
 func parseScript(script string) []scriptSegment {
-	re := regexp.MustCompile(`(\[.+?\])\s*(.*)`)
-	reEmotion := regexp.MustCompile(`\[.+?\]`)
+	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
+	reEmotion := regexp.MustCompile(
+		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
+	)
 
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
@@ -253,71 +301,65 @@ func parseScript(script string) []scriptSegment {
 		}
 
 		matches := re.FindStringSubmatch(line)
-		if len(matches) > 2 {
+		if len(matches) > 3 {
 			speakerTag := matches[1]
-			textWithEmotion := matches[2]
+			vvStyleTag := matches[2]
 
-			// 感情タグを除去し、不要な空白を削除
+			combinedTag := speakerTag + vvStyleTag
+
+			textWithEmotion := matches[3]
+
 			text := reEmotion.ReplaceAllString(textWithEmotion, "")
-			text = regexp.MustCompile(`\s{2,}`).ReplaceAllString(text, " ")
-			text = regexp.MustCompile(`\s$`).ReplaceAllString(text, "")
+			text = strings.TrimSpace(text)
 
-			segments = append(segments, scriptSegment{
-				SpeakerTag: speakerTag,
-				Text:       text,
-			})
+			if text != "" {
+				segments = append(segments, scriptSegment{
+					SpeakerTag: combinedTag,
+					Text:       text,
+				})
+			}
 		}
 	}
 	return segments
 }
 
-// combineWavData は複数の完全なWAVバイトデータを結合し、一つのWAVファイルを返します。
 func combineWavData(wavFiles [][]byte) ([]byte, error) {
 	var rawData []byte
 	totalDataSize := uint32(0)
 
-	// 最初のファイルからフォーマット情報（最初の36バイト）を取得
 	fmtChunkEndIndex := WavRiffHeaderSize + WavFmtChunkSize
 	if len(wavFiles[0]) < fmtChunkEndIndex {
 		return nil, fmt.Errorf("最初のWAVファイルのヘッダー（RIFF + FMT）が短すぎます")
 	}
-	formatHeader := wavFiles[0][0:fmtChunkEndIndex] // 最初の36バイト (RIFFヘッダー + FMTチャンク)
+	formatHeader := wavFiles[0][0:fmtChunkEndIndex]
 
 	for _, wavBytes := range wavFiles {
 		if len(wavBytes) < WavTotalHeaderSize {
 			return nil, fmt.Errorf("WAVファイルが完全なヘッダーを含んでいません")
 		}
 
-		// Dataチャンクのサイズを取得 (バイト40-43)
-		dataSizeStartIndex := WavTotalHeaderSize - DataChunkSizeField // 40バイト目
+		dataSizeStartIndex := WavTotalHeaderSize - DataChunkSizeField
 		dataSize := binary.LittleEndian.Uint32(wavBytes[dataSizeStartIndex:WavTotalHeaderSize])
 
-		// dataチャンクの内容を取得 (44バイト目からデータサイズ分)
 		dataChunk := wavBytes[WavTotalHeaderSize : WavTotalHeaderSize+dataSize]
 
 		rawData = append(rawData, dataChunk...)
 		totalDataSize += dataSize
 	}
 
-	// 新しいWAVファイルを構築
 	combinedWav := make([]byte, WavTotalHeaderSize+totalDataSize)
-	copy(combinedWav, formatHeader) // 最初の36バイト (RIFF, WAVE, FMTチャンク) をコピー
+	copy(combinedWav, formatHeader)
 
-	// "data" チャンクの識別子とサイズを書き込む (バイト36から)
-	dataIDStartIndex := WavRiffHeaderSize + WavFmtChunkSize // 36バイト目
+	dataIDStartIndex := WavRiffHeaderSize + WavFmtChunkSize
 	copy(combinedWav[dataIDStartIndex:], []byte("data"))
 
-	// Data Chunk Size (バイト40-43)を更新
-	dataSizeStartIndex := WavTotalHeaderSize - DataChunkSizeField // 40バイト目
+	dataSizeStartIndex := WavTotalHeaderSize - DataChunkSizeField
 	binary.LittleEndian.PutUint32(combinedWav[dataSizeStartIndex:WavTotalHeaderSize], totalDataSize)
 
-	// ファイル全体のサイズを更新 (バイト4から)
-	// FileSize = WavTotalHeaderSize + totalDataSize - 8 (RIFF IDとFileSizeフィールドの8バイトを引く)
 	fileSize := WavTotalHeaderSize + totalDataSize - WavRiffHeaderSize + RiffChunkSizeField
-	fileSizeStartIndex := RiffChunkIDSize // 4バイト目
+	fileSizeStartIndex := RiffChunkIDSize
 	binary.LittleEndian.PutUint32(combinedWav[fileSizeStartIndex:fileSizeStartIndex+RiffChunkSizeField], fileSize)
 
-	// 結合したデータをコピー (バイト44から)
 	copy(combinedWav[WavTotalHeaderSize:], rawData)
 
 	return combinedWav, nil
