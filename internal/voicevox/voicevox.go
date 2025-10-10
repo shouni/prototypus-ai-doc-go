@@ -10,9 +10,14 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
+
+// ----------------------------------------------------------------------
+// 話者タグとVOICEVOXスタイルタグの定数定義
+// ----------------------------------------------------------------------
 
 // 話者タグの定数定義
 const (
@@ -20,32 +25,43 @@ const (
 	SpeakerTagMetan    = "[めたん]"
 )
 
-// StyleIDMappings は、キャラクター名からVOICEVOXの話者スタイルIDへのマッピングです。
+// VOICEVOXのスタイルIDに対応する感情タグ
+const (
+	VvTagNormal  = "[通常]" // デフォルトスタイル
+	VvTagHappy   = "[喜び]"
+	VvTagAngry   = "[怒り]"
+	VvTagWhisper = "[ささやき]"
+)
+
+// StyleIDMappings は、"話者タグ + スタイルタグ" の組み合わせからVOICEVOXのスタイルIDへのマッピングです。
 var StyleIDMappings = map[string]int{
-	SpeakerTagZundamon: 3, // ずんだもん (ノーマル)
-	SpeakerTagMetan:    2, // 四国めたん (ノーマル)
+	// ずんだもん
+	SpeakerTagZundamon + VvTagNormal:  3,
+	SpeakerTagZundamon + VvTagHappy:   1,
+	SpeakerTagZundamon + VvTagAngry:   4,
+	SpeakerTagZundamon + VvTagWhisper: 18,
+	// 四国めたん
+	SpeakerTagMetan + VvTagNormal: 2,
+	SpeakerTagMetan + VvTagHappy:  15,
+	SpeakerTagMetan + VvTagAngry:  17,
 }
 
-// WAVヘッダーのマジックナンバーの定数化 (変更なし)
+// ----------------------------------------------------------------------
+// 定数 (変更なし)
+// ----------------------------------------------------------------------
+
 const (
-	// WAV/RIFF チャンク
 	RiffChunkIDSize    = 4
 	RiffChunkSizeField = 4
 	WaveIDSize         = 4
 	WavRiffHeaderSize  = RiffChunkIDSize + RiffChunkSizeField + WaveIDSize // 12 bytes
-
-	// FMT チャンク
-	FmtChunkIDSize    = 4
-	FmtChunkSizeField = 4
-	FmtChunkDataSize  = 16
-	WavFmtChunkSize   = FmtChunkIDSize + FmtChunkSizeField + FmtChunkDataSize // 24 bytes
-
-	// DATA チャンク
+	FmtChunkIDSize     = 4
+	FmtChunkSizeField  = 4
+	FmtChunkDataSize   = 16
+	WavFmtChunkSize    = FmtChunkIDSize + FmtChunkSizeField + FmtChunkDataSize // 24 bytes
 	DataChunkIDSize    = 4
 	DataChunkSizeField = 4
 	WavDataHeaderSize  = DataChunkIDSize + DataChunkSizeField // 8 bytes
-
-	// 合計ヘッダーサイズ: 12 + 24 + 8 = 44 bytes
 	WavTotalHeaderSize = WavRiffHeaderSize + WavFmtChunkSize + WavDataHeaderSize
 )
 
@@ -54,11 +70,11 @@ const (
 // ----------------------------------------------------------------------
 
 type scriptSegment struct {
+	// SpeakerTag は [話者タグ][スタイルタグ] の結合タグ
 	SpeakerTag string
 	Text       string
 }
 
-// resultSegment は並列処理の結果を、元の順序（index）とともに保持します。
 type resultSegment struct {
 	index   int
 	wavData []byte
@@ -75,23 +91,20 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 		return fmt.Errorf("VOICEVOX_API_URL 環境変数が設定されていません")
 	}
 
-	// タイムアウトを設定したHTTPクライアント
 	client := &http.Client{
-		Timeout: 180 * time.Second, // 合成処理は時間がかかるため、長めに設定
+		Timeout: 180 * time.Second,
 	}
 
 	segments := parseScript(scriptContent)
 	if len(segments) == 0 {
-		return fmt.Errorf("スクリプトから有効なセグメントを抽出できませんでした")
+		return fmt.Errorf("スクリプトから有効なセグメントを抽出できませんでした。AIの出力形式が [話者タグ][スタイルタグ] テキスト の形式に沿っているか確認してください")
 	}
 
-	// 並列処理のためのセットアップ
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(segments))
 	resultsChan := make(chan resultSegment, len(segments))
 
-	// ★ 同時実行数 5 のセマフォを定義
-	const maxConcurrency = 5
+	const maxConcurrency = 10
 	semaphore := make(chan struct{}, maxConcurrency)
 
 	for i, seg := range segments {
@@ -99,20 +112,49 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 			continue
 		}
 
-		// セマフォにトークンが書き込まれるまで待機（同時実行数を制限）
 		semaphore <- struct{}{}
 		wg.Add(1)
 
 		go func(i int, seg scriptSegment) {
 			defer wg.Done()
-			defer func() { <-semaphore }() // 処理終了時にトークンを解放
+			defer func() { <-semaphore }()
 
+			// スタイルIDの検索とフォールバック処理
+
+			// 1. [話者タグ][スタイルタグ] の複合キーから ID を検索
 			styleID, ok := StyleIDMappings[seg.SpeakerTag]
+
+			// 2. IDが見つからなかった場合のフォールバック処理
 			if !ok {
-				errChan <- fmt.Errorf("話者タグ %s に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, i)
-				return
+				// seg.SpeakerTag は "[話者タグ][スタイルタグ]" なので、最初のタグ ([話者タグ]) を抽出する
+				// 正規表現で再抽出
+				reSpeaker := regexp.MustCompile(`^(\[.+?\])`)
+				speakerMatch := reSpeaker.FindStringSubmatch(seg.SpeakerTag)
+
+				if len(speakerMatch) < 2 {
+					errChan <- fmt.Errorf("話者タグ %s の解析に失敗しました (セグメント %d)", seg.SpeakerTag, i)
+					return
+				}
+
+				baseSpeakerTag := speakerMatch[1] // 例: "[めたん]"
+
+				// デフォルトのスタイル ([通常]) にフォールバックしたキーを作成
+				fallbackKey := baseSpeakerTag + VvTagNormal // 例: "[めたん][通常]"
+
+				defaultStyleID, defaultOk := StyleIDMappings[fallbackKey]
+
+				if defaultOk {
+					styleID = defaultStyleID
+					// ログ出力などを行うと親切
+					fmt.Printf("警告: スタイルタグ %s が見つかりません。デフォルトの %s にフォールバックします (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
+				} else {
+					// デフォルトスタイルも見つからなければエラー
+					errChan <- fmt.Errorf("話者・スタイルタグ %s (およびデフォルトの %s) に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, fallbackKey, i)
+					return
+				}
 			}
 
+			// IDが見つかった or フォールバックで取得できたので処理続行
 			// 1. オーディオクエリ (audio_query) の作成
 			queryBody, err := runAudioQuery(client, apiURL, seg.Text, styleID)
 			if err != nil {
@@ -127,33 +169,26 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 				return
 			}
 
-			// 順序情報と結果をチャネルに送信
 			resultsChan <- resultSegment{index: i, wavData: wavData}
 
-		}(i, seg) // ループ変数をクロージャに渡す
+		}(i, seg)
 	}
 
-	// すべてのゴルーチンの終了を待つ
 	wg.Wait()
 	close(resultsChan)
 	close(errChan)
 
-	// エラーチェック
 	if err := <-errChan; err != nil {
-		return err // 発生した最初のエラーを返す
+		return err
 	}
 
-	// ★ 修正箇所: 結果を元の順序で並べ替える
-	// 結果を一時スライスに格納する代わりに、直接正しいインデックスに格納
 	orderedAudioDataList := make([][]byte, len(segments))
 	for res := range resultsChan {
-		// parseScriptで抽出され、かつAPIコールが成功したセグメントの結果を元のインデックス位置に配置
-		if res.index >= 0 && res.index < len(segments) { // 範囲チェックを追加
+		if res.index >= 0 && res.index < len(segments) {
 			orderedAudioDataList[res.index] = res.wavData
 		}
 	}
 
-	// APIコールがスキップされ、orderedAudioDataListの要素がnilになっているものを除外
 	finalAudioDataList := make([][]byte, 0, len(segments))
 	for _, data := range orderedAudioDataList {
 		if data != nil {
@@ -165,7 +200,6 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 		return fmt.Errorf("すべてのセグメントの合成に失敗したか、有効なセグメントがありませんでした")
 	}
 
-	// 3. 音声ファイルのマージと保存 (WAV連結処理)
 	combinedWavBytes, err := combineWavData(finalAudioDataList)
 	if err != nil {
 		return fmt.Errorf("WAVデータの結合に失敗しました: %w", err)
@@ -175,7 +209,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 }
 
 // ----------------------------------------------------------------------
-// ヘルパー関数 (API呼び出しを分離)
+// ヘルパー関数 (API呼び出し、WAV結合は変更なし)
 // ----------------------------------------------------------------------
 
 // runAudioQuery は /audio_query APIを呼び出し、クエリボディを返します。
@@ -234,13 +268,15 @@ func runSynthesis(client *http.Client, apiURL string, queryBody []byte, styleID 
 	return wavData, nil
 }
 
-// ----------------------------------------------------------------------
-// parseScript と combineWavData (変更なし)
-// ----------------------------------------------------------------------
-
-// parseScript はスクリプトから話者タグとテキストを抽出します。
+// parseScript はスクリプトから話者タグ、VOICEVOXスタイルタグ、およびテキストを抽出します。
 func parseScript(script string) []scriptSegment {
-	re := regexp.MustCompile(`(\[.+?\])\s*(.*)`)
+	// AIの出力形式を厳密にパースする正規表現: [話者タグ][VOICEVOXスタイルタグ] (演出タグとテキスト)
+	// $1: [話者タグ]
+	// $2: [VOICEVOXスタイルタグ] (例: [通常], [喜び], [理解]などのAIが生成したカスタムタグも含む)
+	// $3: スタイルタグ以降の全て (演出タグとテキスト)
+	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
+
+	// 演出タグ除去用の正規表現 (VOICEVOXスタイルタグではないタグを全て削除)
 	reEmotion := regexp.MustCompile(`\[.+?\]`)
 
 	lines := bytes.Split([]byte(script), []byte("\n"))
@@ -253,19 +289,25 @@ func parseScript(script string) []scriptSegment {
 		}
 
 		matches := re.FindStringSubmatch(line)
-		if len(matches) > 2 {
-			speakerTag := matches[1]
-			textWithEmotion := matches[2]
+		if len(matches) > 3 {
+			speakerTag := matches[1] // [ずんだもん]
+			vvStyleTag := matches[2] // [通常] や [理解] などのカスタムタグ
 
-			// 感情タグを除去し、不要な空白を削除
+			// StyleIDMappingsで使うキー: [ずんだもん][通常] のように結合する
+			combinedTag := speakerTag + vvStyleTag
+
+			textWithEmotion := matches[3]
+
+			// 演出用の感情タグを除去し、不要な空白を削除
 			text := reEmotion.ReplaceAllString(textWithEmotion, "")
-			text = regexp.MustCompile(`\s{2,}`).ReplaceAllString(text, " ")
-			text = regexp.MustCompile(`\s$`).ReplaceAllString(text, "")
+			text = strings.TrimSpace(text)
 
-			segments = append(segments, scriptSegment{
-				SpeakerTag: speakerTag,
-				Text:       text,
-			})
+			if text != "" {
+				segments = append(segments, scriptSegment{
+					SpeakerTag: combinedTag, // 結合タグを格納 (フォールバック処理で再解析する)
+					Text:       text,
+				})
+			}
 		}
 	}
 	return segments
