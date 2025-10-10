@@ -11,6 +11,9 @@ var ZundaMetanDialoguePrompt string
 //go:embed zundamon_solo.md
 var ZundamonSoloPrompt string
 
+//go:embed zundametan_duet.md
+var ZundaMetanDuetPrompt string
+
 // GetPromptByMode は、指定されたモードに対応するプロンプト文字列を返します。
 func GetPromptByMode(mode string) (string, error) {
 	switch mode {
@@ -18,7 +21,10 @@ func GetPromptByMode(mode string) (string, error) {
 		return ZundaMetanDialoguePrompt, nil
 	case "solo":
 		return ZundamonSoloPrompt, nil
+	// ★ Duet モードの処理を追加
+	case "duet":
+		return ZundaMetanDuetPrompt, nil
 	default:
-		return "", fmt.Errorf("サポートされていないモード: %s", mode)
+		return "", fmt.Errorf("サポートされていないモード: %s. 'dialogue', 'solo', 'duet' のいずれかを指定してください", mode)
 	}
 }
