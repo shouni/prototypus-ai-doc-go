@@ -323,11 +323,9 @@ func parseScript(script string) []scriptSegment {
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 
 	// 感情タグを除去するための正規表現
-	// [納得] は、話者スタイルタグとして使用されるようになったため、除去対象から除外
 	reEmotion := regexp.MustCompile(
-		`\[(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ)\]`,
+		`\[(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ|納得|通常|喜び|怒り|ささやき)\]`,
 	)
-
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
 
