@@ -25,20 +25,23 @@ const (
 )
 
 const (
-	VvTagNormal  = "[通常]"
-	VvTagHappy   = "[喜び]"
-	VvTagAngry   = "[怒り]"
-	VvTagWhisper = "[ささやき]"
+	VvTagNormal   = "[通常]"
+	VvTagHappy    = "[喜び]"
+	VvTagAngry    = "[怒り]"
+	VvTagWhisper  = "[ささやき]"
+	VvTagGrasping = "[納得]"
 )
 
+// ★ StyleIDMappingsに [ずんだもん][納得] を追加（IDは仮で20）
 var StyleIDMappings = map[string]int{
-	SpeakerTagZundamon + VvTagNormal:  3,
-	SpeakerTagZundamon + VvTagHappy:   1,
-	SpeakerTagZundamon + VvTagAngry:   4,
-	SpeakerTagZundamon + VvTagWhisper: 18,
-	SpeakerTagMetan + VvTagNormal:     2,
-	SpeakerTagMetan + VvTagHappy:      15,
-	SpeakerTagMetan + VvTagAngry:      17,
+	SpeakerTagZundamon + VvTagNormal:   3,
+	SpeakerTagZundamon + VvTagHappy:    1,
+	SpeakerTagZundamon + VvTagAngry:    4,
+	SpeakerTagZundamon + VvTagWhisper:  18,
+	SpeakerTagZundamon + VvTagGrasping: 20, // ★ [ずんだもん][納得] に対応
+	SpeakerTagMetan + VvTagNormal:      2,
+	SpeakerTagMetan + VvTagHappy:       15,
+	SpeakerTagMetan + VvTagAngry:       17,
 }
 
 // 許可された話者タグを定義 (parseScriptで使用)
@@ -319,6 +322,8 @@ func parseScript(script string) []scriptSegment {
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 
 	// 感情タグを除去するための正規表現
+	// [納得] は、話者スタイルタグとして使用されるようになったため、除去対象から除外することも検討できますが、
+	// ここではスクリプト内のインライン感情タグとして扱われる可能性を考慮し、既存のリストに含めておきます。
 	reEmotion := regexp.MustCompile(
 		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
 	)
