@@ -101,7 +101,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	}
 
 	var wg sync.WaitGroup
-	// 修正案1: errChanのバッファサイズを1に変更し、最初のエラーのみをキャプチャする意図を明確にする
+	// errChanのバッファサイズを1に変更し、最初のエラーのみをキャプチャする意図を明確にする
 	errChan := make(chan error, 1)
 	resultsChan := make(chan resultSegment, len(segments))
 
@@ -127,7 +127,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 
 			// 失敗時にerrChanにエラーを送信するヘルパー関数
 			sendError := func(err error) {
-				// 修正案2: selectを使用して非ブロッキングでエラーを送信。最初の1つだけを保持する。
+				// selectを使用して非ブロッキングでエラーを送信。最初の1つだけを保持する。
 				select {
 				case errChan <- err:
 				default:
@@ -150,8 +150,8 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 				baseSpeakerTag := speakerMatch[1]
 				fallbackKey := baseSpeakerTag + VvTagNormal
 
-				// 警告: どのタグがマップに存在しないかをログ出力
-				fmt.Printf("警告: タグ %s がStyleIDMappingsに見つかりません。デフォルトの %s へのフォールバックを試みます (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
+				// 修正: ログメッセージをより具体的に（問題点134-140行）
+				fmt.Printf("警告: スタイルタグ %s がStyleIDMappingsに見つかりません。デフォルトの %s へフォールバックを試みます (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
 
 				defaultStyleID, defaultOk := StyleIDMappings[fallbackKey]
 
@@ -221,7 +221,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	close(resultsChan)
 	close(errChan)
 
-	// 修正案3: selectを使用して非ブロッキングでエラーを読み取り、最初のエラーのみを返す
+	// selectを使用して非ブロッキングでエラーを読み取り、最初のエラーのみを返す
 	var firstErr error
 	select {
 	case err := <-errChan:
@@ -318,14 +318,10 @@ func parseScript(script string) []scriptSegment {
 	// 最初の2つのタグを抽出する正規表現（例: [ずんだもん][通常]）
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 
-	// 修正: reEmotionはデッドコードであるため削除し、代わりに感情タグの除去にreEmotionを再定義する
-	// なお、感情タグの正規表現は既に下の行で定義されている reEmotion を利用して処理しているため、
-	// 削除せずに残すことで、将来的な機能拡張の意図を保持しつつ、現在の処理との整合性を取る。
-	// *ただし、元のコードでは reEmotion の定義と使用が分離していたため、使用している正規表現をここに再定義し、未使用の定義を削除する。
+	// 感情タグを除去するための正規表現
 	reEmotion := regexp.MustCompile(
 		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
 	)
-	// 削除対象であったデッドコードの代わりに、実際に使用されている正規表現を定義し直す。
 
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
@@ -358,7 +354,8 @@ func parseScript(script string) []scriptSegment {
 			if text != "" {
 				segments = append(segments, scriptSegment{
 					SpeakerTag: combinedTag,
-					Text:       text,
+					// 修正: 感情タグを除去したテキストを使用
+					Text: text,
 				})
 			}
 		}
