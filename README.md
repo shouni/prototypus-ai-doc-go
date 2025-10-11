@@ -1,10 +1,8 @@
-# ✍️ prototypus-ai-doc-go
+# ✍️ Prototypus AI Doc Go
 
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/shouni/git-gemini-reviewer-go)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-# Prototypus AI Doc Go
 
 **Prototypus AI Doc Go (PAID Go)** は、Google Gemini API を使用して、開発ドキュメントや技術記事などの長い文章を、対話形式またはモノローグ形式のナレーションスクリプトに変換するための CLI ツールです。
 
