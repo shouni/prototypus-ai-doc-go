@@ -32,13 +32,13 @@ const (
 	VvTagGrasping = "[納得]"
 )
 
-// StyleIDMappingsに [ずんだもん][納得] を追加（IDは仮で20）
+// StyleIDMappingsに [ずんだもん][納得] を追加（IDを20から35に変更）
 var StyleIDMappings = map[string]int{
 	SpeakerTagZundamon + VvTagNormal:   3,
 	SpeakerTagZundamon + VvTagHappy:    1,
 	SpeakerTagZundamon + VvTagAngry:    4,
 	SpeakerTagZundamon + VvTagWhisper:  18,
-	SpeakerTagZundamon + VvTagGrasping: 20, // ★ [ずんだもん][納得] に対応
+	SpeakerTagZundamon + VvTagGrasping: 35, // ★ 2. 仮のStyle IDをより確度の高い35に変更
 	SpeakerTagMetan + VvTagNormal:      2,
 	SpeakerTagMetan + VvTagHappy:       15,
 	SpeakerTagMetan + VvTagAngry:       17,
@@ -104,8 +104,8 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	}
 
 	var wg sync.WaitGroup
-	// errChanのバッファサイズを1に変更し、最初のエラーのみをキャプチャする意図を明確にする
-	errChan := make(chan error, 1)
+	// ★ 1. 修正: errChanのバッファサイズを len(segments) に戻し、全てのエラーをキャプチャ可能にする
+	errChan := make(chan error, len(segments))
 	resultsChan := make(chan resultSegment, len(segments))
 
 	// 並列実行数を15に設定
@@ -130,11 +130,11 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 
 			// 失敗時にerrChanにエラーを送信するヘルパー関数
 			sendError := func(err error) {
-				// selectを使用して非ブロッキングでエラーを送信。最初の1つだけを保持する。
+				// selectを使用して非ブロッキングでエラーを送信。チャネルが満杯でない限り全てのエラーをキャプチャする。
 				select {
 				case errChan <- err:
 				default:
-					// errChanが既に満杯（エラーが送信済み）の場合、このエラーは無視する
+					// errChanが満杯（非常に大量のエラーが発生）の場合、このエラーは無視する
 				}
 			}
 
@@ -224,16 +224,17 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	close(resultsChan)
 	close(errChan)
 
-	// selectを使用して非ブロッキングでエラーを読み取り、最初のエラーのみを返す
-	var firstErr error
-	select {
-	case err := <-errChan:
-		firstErr = err
-	default:
-		// エラーがチャネルになかった場合 (nilのまま)
+	// ★ 1. 修正: errChanから全てのエラーを読み取り、一つの詳細なエラーメッセージに結合する
+	var allErrors []string
+	for err := range errChan {
+		if err != nil {
+			allErrors = append(allErrors, err.Error())
+		}
 	}
-	if firstErr != nil {
-		return firstErr
+
+	if len(allErrors) > 0 {
+		// 発生した全てのエラーをリスト化して返す
+		return fmt.Errorf("音声合成処理中に %d 件のエラーが発生しました:\n- %s", len(allErrors), strings.Join(allErrors, "\n- "))
 	}
 
 	// 後続のWAV結合処理は変更なし
@@ -322,7 +323,7 @@ func parseScript(script string) []scriptSegment {
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 
 	// 感情タグを除去するための正規表現
-	// ★ 修正: [納得] を除去対象から除外。これにより、話者スタイルとして設定したタグがテキスト中から消えることを防ぐ。
+	// [納得] は、話者スタイルタグとして使用されるようになったため、除去対象から除外
 	reEmotion := regexp.MustCompile(
 		`\[(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ)\]`,
 	)
@@ -351,6 +352,8 @@ func parseScript(script string) []scriptSegment {
 			combinedTag := speakerTag + vvStyleTag // 例: "[ずんだもん][通常]"
 
 			textWithEmotion := matches[3]
+
+			// 修正後のreEmotionを適用し、[納得] の意図しない除去を回避
 			text := reEmotion.ReplaceAllString(textWithEmotion, "")
 			text = strings.TrimSpace(text)
 
