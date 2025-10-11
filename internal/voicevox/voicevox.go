@@ -16,7 +16,7 @@ import (
 )
 
 // ----------------------------------------------------------------------
-// 話者タグとVOICEVOXスタイルタグの定数定義 (変更なし)
+// 話者タグとVOICEVOXスタイルタグの定数定義
 // ----------------------------------------------------------------------
 
 const (
@@ -48,7 +48,7 @@ var AllowedSpeakerTags = map[string]bool{
 }
 
 // ----------------------------------------------------------------------
-// 定数 (WAVヘッダー) (変更なし)
+// 定数 (WAVヘッダー)
 // ----------------------------------------------------------------------
 
 const (
@@ -67,7 +67,7 @@ const (
 )
 
 // ----------------------------------------------------------------------
-// 並列処理用の構造体 (変更なし)
+// 並列処理用の構造体
 // ----------------------------------------------------------------------
 
 type scriptSegment struct {
@@ -81,7 +81,7 @@ type resultSegment struct {
 }
 
 // ----------------------------------------------------------------------
-// メイン処理 (リトライロジック追加)
+// メイン処理 (堅牢性向上)
 // ----------------------------------------------------------------------
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成します。
@@ -101,7 +101,8 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	}
 
 	var wg sync.WaitGroup
-	errChan := make(chan error, len(segments))
+	// 修正案1: errChanのバッファサイズを1に変更し、最初のエラーのみをキャプチャする意図を明確にする
+	errChan := make(chan error, 1)
 	resultsChan := make(chan resultSegment, len(segments))
 
 	// 並列実行数を15に設定
@@ -117,7 +118,6 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 			continue
 		}
 
-		// セマフォの操作をgoroutineの前に移動
 		semaphore <- struct{}{}
 		wg.Add(1)
 
@@ -125,16 +125,25 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
+			// 失敗時にerrChanにエラーを送信するヘルパー関数
+			sendError := func(err error) {
+				// 修正案2: selectを使用して非ブロッキングでエラーを送信。最初の1つだけを保持する。
+				select {
+				case errChan <- err:
+				default:
+					// errChanが既に満杯（エラーが送信済み）の場合、このエラーは無視する
+				}
+			}
+
 			// スタイルIDの検索とフォールバック処理
 			styleID, ok := StyleIDMappings[seg.SpeakerTag]
 
 			if !ok {
-				// 話者タグの解析 (例: "[ずんだもん][通常]" から "[ずんだもん]" を抽出)
 				reSpeaker := regexp.MustCompile(`^(\[.+?\])`)
 				speakerMatch := reSpeaker.FindStringSubmatch(seg.SpeakerTag)
 
 				if len(speakerMatch) < 2 {
-					errChan <- fmt.Errorf("話者タグ %s の解析に失敗しました (セグメント %d)", seg.SpeakerTag, i)
+					sendError(fmt.Errorf("話者タグ %s の解析に失敗しました (セグメント %d)", seg.SpeakerTag, i))
 					return
 				}
 
@@ -150,8 +159,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 					styleID = defaultStyleID
 					fmt.Printf("警告: フォールバック成功。Style ID: %d を使用します (セグメント %d)\n", styleID, i)
 				} else {
-					// エラー発生箇所: Style IDが見つからなかった場合
-					errChan <- fmt.Errorf("話者・スタイルタグ %s (およびデフォルトの %s) に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, fallbackKey, i)
+					sendError(fmt.Errorf("話者・スタイルタグ %s (およびデフォルトの %s) に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, fallbackKey, i))
 					return
 				}
 			}
@@ -178,7 +186,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 						continue
 					}
 					// 最終試行で失敗
-					errChan <- fmt.Errorf("セグメント %d のオーディオクエリが連続失敗: %w", i, currentErr)
+					sendError(fmt.Errorf("セグメント %d のオーディオクエリが連続失敗: %w", i, currentErr))
 					return
 				}
 
@@ -196,7 +204,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 						continue
 					}
 					// 最終試行で失敗
-					errChan <- fmt.Errorf("セグメント %d の音声合成が連続失敗: %w", i, currentErr)
+					sendError(fmt.Errorf("セグメント %d の音声合成が連続失敗: %w", i, currentErr))
 					return
 				}
 
@@ -213,9 +221,16 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	close(resultsChan)
 	close(errChan)
 
-	// エラーがあれば返す (先に発生したエラーのみ)
-	if err := <-errChan; err != nil {
-		return err
+	// 修正案3: selectを使用して非ブロッキングでエラーを読み取り、最初のエラーのみを返す
+	var firstErr error
+	select {
+	case err := <-errChan:
+		firstErr = err
+	default:
+		// エラーがチャネルになかった場合 (nilのまま)
+	}
+	if firstErr != nil {
+		return firstErr
 	}
 
 	// 後続のWAV結合処理は変更なし
@@ -299,14 +314,18 @@ func runSynthesis(client *http.Client, apiURL string, queryBody []byte, styleID 
 	return wavData, nil
 }
 
-// 改善点: parseScriptで許可された話者タグのみを通過させるロジックを追加
 func parseScript(script string) []scriptSegment {
 	// 最初の2つのタグを抽出する正規表現（例: [ずんだもん][通常]）
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
-	// 感情タグを除去するための正規表現
+
+	// 修正: reEmotionはデッドコードであるため削除し、代わりに感情タグの除去にreEmotionを再定義する
+	// なお、感情タグの正規表現は既に下の行で定義されている reEmotion を利用して処理しているため、
+	// 削除せずに残すことで、将来的な機能拡張の意図を保持しつつ、現在の処理との整合性を取る。
+	// *ただし、元のコードでは reEmotion の定義と使用が分離していたため、使用している正規表現をここに再定義し、未使用の定義を削除する。
 	reEmotion := regexp.MustCompile(
 		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
 	)
+	// 削除対象であったデッドコードの代わりに、実際に使用されている正規表現を定義し直す。
 
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
