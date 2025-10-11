@@ -16,7 +16,7 @@ import (
 )
 
 // ----------------------------------------------------------------------
-// 話者タグとVOICEVOXスタイルタグの定数定義 (変更なし)
+// 話者タグとVOICEVOXスタイルタグの定数定義
 // ----------------------------------------------------------------------
 
 const (
@@ -25,24 +25,33 @@ const (
 )
 
 const (
-	VvTagNormal  = "[通常]"
-	VvTagHappy   = "[喜び]"
-	VvTagAngry   = "[怒り]"
-	VvTagWhisper = "[ささやき]"
+	VvTagNormal   = "[通常]"
+	VvTagHappy    = "[喜び]"
+	VvTagAngry    = "[怒り]"
+	VvTagWhisper  = "[ささやき]"
+	VvTagGrasping = "[納得]"
 )
 
+// StyleIDMappingsに [ずんだもん][納得] を追加（IDを20から35に変更）
 var StyleIDMappings = map[string]int{
-	SpeakerTagZundamon + VvTagNormal:  3,
-	SpeakerTagZundamon + VvTagHappy:   1,
-	SpeakerTagZundamon + VvTagAngry:   4,
-	SpeakerTagZundamon + VvTagWhisper: 18,
-	SpeakerTagMetan + VvTagNormal:     2,
-	SpeakerTagMetan + VvTagHappy:      15,
-	SpeakerTagMetan + VvTagAngry:      17,
+	SpeakerTagZundamon + VvTagNormal:   3,
+	SpeakerTagZundamon + VvTagHappy:    1,
+	SpeakerTagZundamon + VvTagAngry:    4,
+	SpeakerTagZundamon + VvTagWhisper:  18,
+	SpeakerTagZundamon + VvTagGrasping: 35, // ★ 2. 仮のStyle IDをより確度の高い35に変更
+	SpeakerTagMetan + VvTagNormal:      2,
+	SpeakerTagMetan + VvTagHappy:       15,
+	SpeakerTagMetan + VvTagAngry:       17,
+}
+
+// 許可された話者タグを定義 (parseScriptで使用)
+var AllowedSpeakerTags = map[string]bool{
+	SpeakerTagZundamon: true,
+	SpeakerTagMetan:    true,
 }
 
 // ----------------------------------------------------------------------
-// 定数 (WAVヘッダー) (変更なし)
+// 定数 (WAVヘッダー)
 // ----------------------------------------------------------------------
 
 const (
@@ -61,11 +70,11 @@ const (
 )
 
 // ----------------------------------------------------------------------
-// 並列処理用の構造体 (変更なし)
+// 並列処理用の構造体
 // ----------------------------------------------------------------------
 
 type scriptSegment struct {
-	SpeakerTag string
+	SpeakerTag string // 例: "[ずんだもん][通常]"
 	Text       string
 }
 
@@ -75,7 +84,7 @@ type resultSegment struct {
 }
 
 // ----------------------------------------------------------------------
-// メイン処理 (リトライロジック追加)
+// メイン処理 (堅牢性向上)
 // ----------------------------------------------------------------------
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成します。
@@ -95,6 +104,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	}
 
 	var wg sync.WaitGroup
+	// ★ 1. 修正: errChanのバッファサイズを len(segments) に戻し、全てのエラーをキャプチャ可能にする
 	errChan := make(chan error, len(segments))
 	resultsChan := make(chan resultSegment, len(segments))
 
@@ -118,6 +128,16 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 			defer wg.Done()
 			defer func() { <-semaphore }()
 
+			// 失敗時にerrChanにエラーを送信するヘルパー関数
+			sendError := func(err error) {
+				// selectを使用して非ブロッキングでエラーを送信。チャネルが満杯でない限り全てのエラーをキャプチャする。
+				select {
+				case errChan <- err:
+				default:
+					// errChanが満杯（非常に大量のエラーが発生）の場合、このエラーは無視する
+				}
+			}
+
 			// スタイルIDの検索とフォールバック処理
 			styleID, ok := StyleIDMappings[seg.SpeakerTag]
 
@@ -126,20 +146,23 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 				speakerMatch := reSpeaker.FindStringSubmatch(seg.SpeakerTag)
 
 				if len(speakerMatch) < 2 {
-					errChan <- fmt.Errorf("話者タグ %s の解析に失敗しました (セグメント %d)", seg.SpeakerTag, i)
+					sendError(fmt.Errorf("話者タグ %s の解析に失敗しました (セグメント %d)", seg.SpeakerTag, i))
 					return
 				}
 
 				baseSpeakerTag := speakerMatch[1]
 				fallbackKey := baseSpeakerTag + VvTagNormal
 
+				// ログメッセージ
+				fmt.Printf("警告: スタイルタグ %s がStyleIDMappingsに見つかりません。デフォルトの %s へフォールバックを試みます (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
+
 				defaultStyleID, defaultOk := StyleIDMappings[fallbackKey]
 
 				if defaultOk {
 					styleID = defaultStyleID
-					fmt.Printf("警告: スタイルタグ %s が見つかりません。デフォルトの %s にフォールバックします (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
+					fmt.Printf("警告: フォールバック成功。Style ID: %d を使用します (セグメント %d)\n", styleID, i)
 				} else {
-					errChan <- fmt.Errorf("話者・スタイルタグ %s (およびデフォルトの %s) に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, fallbackKey, i)
+					sendError(fmt.Errorf("話者・スタイルタグ %s (およびデフォルトの %s) に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, fallbackKey, i))
 					return
 				}
 			}
@@ -166,7 +189,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 						continue
 					}
 					// 最終試行で失敗
-					errChan <- fmt.Errorf("セグメント %d のオーディオクエリが連続失敗: %w", i, currentErr)
+					sendError(fmt.Errorf("セグメント %d のオーディオクエリが連続失敗: %w", i, currentErr))
 					return
 				}
 
@@ -184,7 +207,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 						continue
 					}
 					// 最終試行で失敗
-					errChan <- fmt.Errorf("セグメント %d の音声合成が連続失敗: %w", i, currentErr)
+					sendError(fmt.Errorf("セグメント %d の音声合成が連続失敗: %w", i, currentErr))
 					return
 				}
 
@@ -201,10 +224,20 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	close(resultsChan)
 	close(errChan)
 
-	if err := <-errChan; err != nil {
-		return err
+	// ★ 1. 修正: errChanから全てのエラーを読み取り、一つの詳細なエラーメッセージに結合する
+	var allErrors []string
+	for err := range errChan {
+		if err != nil {
+			allErrors = append(allErrors, err.Error())
+		}
 	}
 
+	if len(allErrors) > 0 {
+		// 発生した全てのエラーをリスト化して返す
+		return fmt.Errorf("音声合成処理中に %d 件のエラーが発生しました:\n- %s", len(allErrors), strings.Join(allErrors, "\n- "))
+	}
+
+	// 後続のWAV結合処理は変更なし
 	orderedAudioDataList := make([][]byte, len(segments))
 	for res := range resultsChan {
 		if res.index >= 0 && res.index < len(segments) {
@@ -286,9 +319,13 @@ func runSynthesis(client *http.Client, apiURL string, queryBody []byte, styleID 
 }
 
 func parseScript(script string) []scriptSegment {
+	// 最初の2つのタグを抽出する正規表現（例: [ずんだもん][通常]）
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
+
+	// 感情タグを除去するための正規表現
+	// [納得] は、話者スタイルタグとして使用されるようになったため、除去対象から除外
 	reEmotion := regexp.MustCompile(
-		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
+		`\[(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ)\]`,
 	)
 
 	lines := bytes.Split([]byte(script), []byte("\n"))
@@ -302,20 +339,29 @@ func parseScript(script string) []scriptSegment {
 
 		matches := re.FindStringSubmatch(line)
 		if len(matches) > 3 {
-			speakerTag := matches[1]
-			vvStyleTag := matches[2]
+			speakerTag := matches[1] // 例: "[ずんだもん]"
+			vvStyleTag := matches[2] // 例: "[通常]"
 
-			combinedTag := speakerTag + vvStyleTag
+			// 許可された話者タグかどうかをチェック (不正なタグの混入対策)
+			if !AllowedSpeakerTags[speakerTag] {
+				// ログ出力で不正なタグの存在を警告し、このセグメントをスキップ
+				fmt.Printf("警告: スクリプトの不正な話者タグをスキップします: %s (行: %s)\n", speakerTag, line)
+				continue
+			}
+
+			combinedTag := speakerTag + vvStyleTag // 例: "[ずんだもん][通常]"
 
 			textWithEmotion := matches[3]
 
+			// 修正後のreEmotionを適用し、[納得] の意図しない除去を回避
 			text := reEmotion.ReplaceAllString(textWithEmotion, "")
 			text = strings.TrimSpace(text)
 
 			if text != "" {
 				segments = append(segments, scriptSegment{
 					SpeakerTag: combinedTag,
-					Text:       text,
+					// 修正: 感情タグを除去したテキストを使用
+					Text: text,
 				})
 			}
 		}
