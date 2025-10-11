@@ -32,7 +32,7 @@ const (
 	VvTagGrasping = "[納得]"
 )
 
-// ★ StyleIDMappingsに [ずんだもん][納得] を追加（IDは仮で20）
+// StyleIDMappingsに [ずんだもん][納得] を追加（IDは仮で20）
 var StyleIDMappings = map[string]int{
 	SpeakerTagZundamon + VvTagNormal:   3,
 	SpeakerTagZundamon + VvTagHappy:    1,
@@ -153,7 +153,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 				baseSpeakerTag := speakerMatch[1]
 				fallbackKey := baseSpeakerTag + VvTagNormal
 
-				// 修正: ログメッセージをより具体的に（問題点134-140行）
+				// ログメッセージ
 				fmt.Printf("警告: スタイルタグ %s がStyleIDMappingsに見つかりません。デフォルトの %s へフォールバックを試みます (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
 
 				defaultStyleID, defaultOk := StyleIDMappings[fallbackKey]
@@ -322,10 +322,9 @@ func parseScript(script string) []scriptSegment {
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 
 	// 感情タグを除去するための正規表現
-	// [納得] は、話者スタイルタグとして使用されるようになったため、除去対象から除外することも検討できますが、
-	// ここではスクリプト内のインライン感情タグとして扱われる可能性を考慮し、既存のリストに含めておきます。
+	// ★ 修正: [納得] を除去対象から除外。これにより、話者スタイルとして設定したタグがテキスト中から消えることを防ぐ。
 	reEmotion := regexp.MustCompile(
-		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
+		`\[(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ)\]`,
 	)
 
 	lines := bytes.Split([]byte(script), []byte("\n"))
@@ -352,7 +351,6 @@ func parseScript(script string) []scriptSegment {
 			combinedTag := speakerTag + vvStyleTag // 例: "[ずんだもん][通常]"
 
 			textWithEmotion := matches[3]
-
 			text := reEmotion.ReplaceAllString(textWithEmotion, "")
 			text = strings.TrimSpace(text)
 
