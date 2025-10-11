@@ -41,6 +41,12 @@ var StyleIDMappings = map[string]int{
 	SpeakerTagMetan + VvTagAngry:      17,
 }
 
+// 許可された話者タグを定義 (parseScriptで使用)
+var AllowedSpeakerTags = map[string]bool{
+	SpeakerTagZundamon: true,
+	SpeakerTagMetan:    true,
+}
+
 // ----------------------------------------------------------------------
 // 定数 (WAVヘッダー) (変更なし)
 // ----------------------------------------------------------------------
@@ -65,7 +71,7 @@ const (
 // ----------------------------------------------------------------------
 
 type scriptSegment struct {
-	SpeakerTag string
+	SpeakerTag string // 例: "[ずんだもん][通常]"
 	Text       string
 }
 
@@ -111,6 +117,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 			continue
 		}
 
+		// セマフォの操作をgoroutineの前に移動
 		semaphore <- struct{}{}
 		wg.Add(1)
 
@@ -122,6 +129,7 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 			styleID, ok := StyleIDMappings[seg.SpeakerTag]
 
 			if !ok {
+				// 話者タグの解析 (例: "[ずんだもん][通常]" から "[ずんだもん]" を抽出)
 				reSpeaker := regexp.MustCompile(`^(\[.+?\])`)
 				speakerMatch := reSpeaker.FindStringSubmatch(seg.SpeakerTag)
 
@@ -133,12 +141,16 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 				baseSpeakerTag := speakerMatch[1]
 				fallbackKey := baseSpeakerTag + VvTagNormal
 
+				// 警告: どのタグがマップに存在しないかをログ出力
+				fmt.Printf("警告: タグ %s がStyleIDMappingsに見つかりません。デフォルトの %s へのフォールバックを試みます (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
+
 				defaultStyleID, defaultOk := StyleIDMappings[fallbackKey]
 
 				if defaultOk {
 					styleID = defaultStyleID
-					fmt.Printf("警告: スタイルタグ %s が見つかりません。デフォルトの %s にフォールバックします (セグメント %d)\n", seg.SpeakerTag, fallbackKey, i)
+					fmt.Printf("警告: フォールバック成功。Style ID: %d を使用します (セグメント %d)\n", styleID, i)
 				} else {
+					// エラー発生箇所: Style IDが見つからなかった場合
 					errChan <- fmt.Errorf("話者・スタイルタグ %s (およびデフォルトの %s) に対応するVOICEVOX Style IDが見つかりません (セグメント %d)", seg.SpeakerTag, fallbackKey, i)
 					return
 				}
@@ -201,10 +213,12 @@ func PostToEngine(scriptContent string, outputWavFile string) error {
 	close(resultsChan)
 	close(errChan)
 
+	// エラーがあれば返す (先に発生したエラーのみ)
 	if err := <-errChan; err != nil {
 		return err
 	}
 
+	// 後続のWAV結合処理は変更なし
 	orderedAudioDataList := make([][]byte, len(segments))
 	for res := range resultsChan {
 		if res.index >= 0 && res.index < len(segments) {
@@ -285,8 +299,11 @@ func runSynthesis(client *http.Client, apiURL string, queryBody []byte, styleID 
 	return wavData, nil
 }
 
+// 改善点: parseScriptで許可された話者タグのみを通過させるロジックを追加
 func parseScript(script string) []scriptSegment {
+	// 最初の2つのタグを抽出する正規表現（例: [ずんだもん][通常]）
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
+	// 感情タグを除去するための正規表現
 	reEmotion := regexp.MustCompile(
 		`\[(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ)\]`,
 	)
@@ -302,10 +319,17 @@ func parseScript(script string) []scriptSegment {
 
 		matches := re.FindStringSubmatch(line)
 		if len(matches) > 3 {
-			speakerTag := matches[1]
-			vvStyleTag := matches[2]
+			speakerTag := matches[1] // 例: "[ずんだもん]"
+			vvStyleTag := matches[2] // 例: "[通常]"
 
-			combinedTag := speakerTag + vvStyleTag
+			// 許可された話者タグかどうかをチェック (不正なタグの混入対策)
+			if !AllowedSpeakerTags[speakerTag] {
+				// ログ出力で不正なタグの存在を警告し、このセグメントをスキップ
+				fmt.Printf("警告: スクリプトの不正な話者タグをスキップします: %s (行: %s)\n", speakerTag, line)
+				continue
+			}
+
+			combinedTag := speakerTag + vvStyleTag // 例: "[ずんだもん][通常]"
 
 			textWithEmotion := matches[3]
 
