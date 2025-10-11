@@ -29,7 +29,7 @@ var generateCmd = &cobra.Command{
 	Short: "文章を読み込み、ずんだもん/めたんの対話スクリプトを生成します。",
 	Long: `
 'generate' コマンドは、入力された文章を Gemini API に送り、
-指定されたモード（dialogue/solo）に基づいて整形されたナレーションスクリプトを生成します。
+指定されたモード（dialogue/solo/duet）に基づいて整形されたナレーションスクリプトを生成します。
 
 入力元を指定しない場合、標準入力 (stdin) から文章を読み込みます。
 出力先を指定しない場合、標準出力 (stdout) に結果を出力します。
@@ -50,8 +50,8 @@ func init() {
 		"生成されたスクリプトの出力ファイル名 (例: out/script.md)。省略時は標準出力 (stdout) に出力します。")
 
 	// -m, --mode フラグ
-	generateCmd.Flags().StringVarP(&mode, "mode", "m", "dialogue",
-		"スクリプト生成モードを指定: 'dialogue' (ずんだもん/めたん対話) または 'solo' (ずんだもんモノローグ)")
+	generateCmd.Flags().StringVarP(&mode, "mode", "m", "solo",
+		"スクリプト生成モードを指定: 'dialogue' (ずんだもん/めたん対話), 'solo' (ずんだもんモノローグ), 'duet' (交互ナレーション)")
 
 	// -p, --post-api フラグ
 	generateCmd.Flags().BoolVarP(&postAPI, "post-api", "p", false,
@@ -89,7 +89,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
-	defer aiClient.Close() // ★ 修正点2: クライアントを確実に閉じる
+	defer aiClient.Close() // クライアントを確実に閉じる
 
 	generatedScript, err := aiClient.GenerateScript(context.Background(), inputContent, mode)
 	if err != nil {
@@ -162,18 +162,4 @@ func readInput(filename string) ([]byte, error) {
 	// 標準入力から読み込み
 	fmt.Println("標準入力 (stdin) から読み込み中...")
 	return io.ReadAll(os.Stdin)
-}
-
-// writeOutput は、ファイルまたは標準出力に内容を書き出します。
-func writeOutput(filename string, content string) error {
-	if filename != "" {
-		// ファイルに書き出し
-		fmt.Printf("\n--- スクリプト生成完了 ---\nファイルに書き込みました: %s\n", filename)
-		return os.WriteFile(filename, []byte(content), 0644)
-	}
-
-	// 標準出力に書き出し
-	fmt.Println("\n--- スクリプト生成結果 ---")
-	fmt.Println(content)
-	return nil
 }
