@@ -45,9 +45,6 @@ func init() {
 	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL (例: https://example.com/article)。")
 	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
 
-	// 入力フラグは相互に排他的であるとマーク (Cobraが自動でエラーチェックを行う)
-	generateCmd.MarkFlagsMutuallyExclusive("script-url", "script-file", "input-file")
-
 	// --- 出力/設定フラグ ---
 
 	// -o, --output-file フラグ
