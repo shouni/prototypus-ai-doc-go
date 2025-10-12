@@ -12,6 +12,7 @@ import (
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
 	"prototypus-ai-doc-go/internal/voicevox"
+	"prototypus-ai-doc-go/internal/web"
 )
 
 // generateCmd のフラグ変数を定義
@@ -21,6 +22,8 @@ var (
 	mode           string
 	postAPI        bool
 	voicevoxOutput string
+	scriptURL      string
+	scriptFile     string
 )
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
@@ -41,7 +44,7 @@ func init() {
 	// generateCmd をルートコマンドに追加
 	rootCmd.AddCommand(generateCmd)
 
-	// -i, --input-file フラグ
+	// -i, --input-file フラグ (レガシー/汎用ファイル入力)
 	generateCmd.Flags().StringVarP(&inputFile, "input-file", "i", "",
 		"元となる文章が書かれたファイルのパス。省略時は標準入力 (stdin) を使用します。")
 
@@ -60,6 +63,10 @@ func init() {
 	// -v, --voicevox フラグの定義
 	generateCmd.Flags().StringVarP(&voicevoxOutput, "voicevox", "v", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+
+	// 新しい入力フラグ
+	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "入力ソースURL (例: https://example.com/article)")
+	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルパス ('-'で標準入力) (例: script.txt)")
 }
 
 // runGenerate は generate コマンドの実行ロジックです。
@@ -69,11 +76,46 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください。")
 	}
 
-	// 1. 入力元から文章を読み込む
-	inputContent, err := readInput(inputFile)
-	if err != nil {
-		// ファイル読み込み失敗時にエラーメッセージを表示
-		return fmt.Errorf("入力ファイルの読み込みに失敗しました: %w", err)
+	// --- 1. 入力元から文章を読み込む（新しい統合ロジック） ---
+	var inputContent []byte
+	var err error
+
+	if scriptURL != "" {
+		// URLからの取得を最優先
+		fmt.Printf("URLからコンテンツを取得中: %s\n", scriptURL)
+		text, e := web.FetchAndExtractText(scriptURL, cmd.Context())
+		if e != nil {
+			return fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", e)
+		}
+		inputContent = []byte(text)
+	} else if scriptFile != "" {
+		// 新しいスクリプトファイル/標準入力フラグ
+		fmt.Printf("スクリプトファイルから読み込み中: %s\n", scriptFile)
+		if scriptFile == "-" {
+			inputContent, err = io.ReadAll(os.Stdin)
+		} else {
+			inputContent, err = os.ReadFile(scriptFile)
+		}
+		if err != nil {
+			return fmt.Errorf("ファイルの読み込みに失敗しました: %w", err)
+		}
+	} else {
+		// 既存の inputFile フラグのロジック（またはデフォルトの標準入力）
+		if inputFile != "" {
+			fmt.Printf("入力ファイルから読み込み中: %s\n", inputFile)
+			inputContent, err = os.ReadFile(inputFile)
+			if err != nil {
+				return fmt.Errorf("ファイルの読み込みに失敗しました: %w", err)
+			}
+		} else {
+			// フラグ指定なしの場合、標準入力から読み込み
+			fmt.Println("標準入力 (stdin) から読み込み中...")
+			inputContent, err = io.ReadAll(os.Stdin)
+			if err != nil {
+				// 標準入力からの読み込みエラーは致命的
+				return fmt.Errorf("標準入力の読み込みに失敗しました: %w", err)
+			}
+		}
 	}
 
 	// 入力チェックを強化
@@ -110,7 +152,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 		// VOICEVOXスタイルデータ（話者情報）をロード
 		fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-		// cmd.Context() を利用してロード処理もキャンセル可能にするのがベストだが、ここではシンプルに
 		speakerData, err := voicevox.LoadSpeakers(cmd.Context(), voicevoxAPIURL)
 		if err != nil {
 			return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
@@ -167,17 +208,4 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// readInput は、ファイルまたは標準入力から内容を読み込みます。
-func readInput(filename string) ([]byte, error) {
-	if filename != "" {
-		// ファイルから読み込み
-		fmt.Printf("ファイルから読み込み中: %s\n", filename)
-		return os.ReadFile(filename)
-	}
-
-	// 標準入力から読み込み
-	fmt.Println("標準入力 (stdin) から読み込み中...")
-	return io.ReadAll(os.Stdin)
 }
