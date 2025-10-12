@@ -1,13 +1,13 @@
 package voicevox
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // ----------------------------------------------------------------------
@@ -67,12 +67,10 @@ type VVSpeaker struct {
 }
 
 // LoadSpeakers は /speakers エンドポイントからデータを取得し、SpeakerDataを構築します。
-func LoadSpeakers(apiURL string) (*SpeakerData, error) {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
+func LoadSpeakers(ctx context.Context, apiURL string) (*SpeakerData, error) {
+	client := NewAPIClient(apiURL)
 
-	resp, err := client.Get(fmt.Sprintf("%s/speakers", apiURL))
+	resp, err := client.Get(fmt.Sprintf("%s/speakers", client.apiURL), ctx)
 	if err != nil {
 		return nil, fmt.Errorf("/speakers API呼び出し失敗。VOICEVOXエンジンが起動しているか確認してください: %w", err)
 	}

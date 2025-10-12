@@ -18,15 +18,29 @@ type APIClient struct {
 	apiURL string
 }
 
+const (
+	// HTTPクライアントのタイムアウトを一元管理
+	httpClientTimeout = 120 * time.Second
+)
+
 // NewAPIClient は新しいAPIClientインスタンスを初期化します。
 // エンタープライズ環境を想定し、接続レベルのタイムアウトを設定します。
 func NewAPIClient(apiURL string) *APIClient {
 	return &APIClient{
 		client: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout: httpClientTimeout,
 		},
 		apiURL: apiURL,
 	}
+}
+
+func (c *APIClient) Get(url string, ctx context.Context) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	// contextを付与したリクエストを実行
+	return c.client.Do(req)
 }
 
 // runAudioQuery は /audio_query API を呼び出し、音声合成のためのクエリJSONを返します。

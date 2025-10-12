@@ -111,7 +111,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		// VOICEVOXスタイルデータ（話者情報）をロード
 		fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
 		// cmd.Context() を利用してロード処理もキャンセル可能にするのがベストだが、ここではシンプルに
-		speakerData, err := voicevox.LoadSpeakers(voicevoxAPIURL)
+		speakerData, err := voicevox.LoadSpeakers(cmd.Context(), voicevoxAPIURL)
 		if err != nil {
 			return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 		}
