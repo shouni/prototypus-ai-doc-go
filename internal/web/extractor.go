@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
+	"time" // timeパッケージを追加
 
 	"github.com/PuerkitoBio/goquery"
 )
 
 // FetchAndExtractText はURLからコンテンツを取得し、記事本文を抽出します。
-// 汎用的な記事抽出のため、<article>または<main>タグ内のテキストを優先します。
 func FetchAndExtractText(url string, ctx context.Context) (string, error) {
 	// HTTPリクエストのセットアップ
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -18,9 +19,14 @@ func FetchAndExtractText(url string, ctx context.Context) (string, error) {
 		return "", fmt.Errorf("リクエスト作成エラー: %w", err)
 	}
 
-	client := &http.Client{}
+	// タイムアウト設定を追加したHTTPクライアント
+	client := &http.Client{
+		Timeout: 60 * time.Second, // 30秒のタイムアウトを設定
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
+		// context.Canceled や context.DeadlineExceeded もここで捕捉される
 		return "", fmt.Errorf("HTTPリクエストエラー: %w", err)
 	}
 	defer resp.Body.Close()
@@ -43,11 +49,7 @@ func FetchAndExtractText(url string, ctx context.Context) (string, error) {
 		parts = append(parts, "【記事タイトル】 "+pageTitle)
 	}
 
-	// 2. 記事本文の抽出 (メインコンテンツエリアの特定)
-	// 多くのブログや記事サイトは <article> または <main> タグ内に本文を格納します。
-	// より広い範囲をカバーするため、一般的なセレクタを組み合わせます。
-
-	// メインコンテナを特定: article, main, または role="main" を持つ div
+	// 2. 記事本文の抽出
 	mainContent := doc.Find("article, main, div[role='main']").First()
 	if mainContent.Length() == 0 {
 		// メインコンテナが見つからなかった場合、ボディ全体を対象にする
@@ -57,18 +59,22 @@ func FetchAndExtractText(url string, ctx context.Context) (string, error) {
 	// 記事本体内の段落や見出しを取得し、テキストを結合
 	mainContent.Find("p, h1, h2, h3").Each(func(i int, s *goquery.Selection) {
 		text := strings.TrimSpace(s.Text())
-		// ノイズ（非常に短いテキスト）を除去
+
+		// ノイズ（非常に短いテキスト）を除去。閾値はコンテンツの性質によって調整の余地あり。
+		// 見出しタグは重要度が高いため、短いテキストでも許容するロジックを追加しても良い。
 		if len(text) > 10 {
 			// 段落区切りとして二重改行を挿入
 			parts = append(parts, text)
 		}
 	})
 
-	if len(parts) <= 1 {
-		// タイトルのみで本文がない場合、エラーではなく警告として処理（AIにタイトルだけでも渡す）
-		if len(parts) == 0 {
-			return "", fmt.Errorf("記事本文とタイトルを抽出できませんでした。")
-		}
+	if len(parts) == 0 {
+		return "", fmt.Errorf("記事本文とタイトルを抽出できませんでした。")
+	}
+	if len(parts) == 1 && strings.HasPrefix(parts[0], "【記事タイトル】") {
+		// タイトルのみで本文がない場合、警告として扱い、タイトルはAIに渡す（ユーザーの意図を尊重）
+		// 必要に応じて、ログ出力などでユーザーに警告を伝えることが望ましい。
+		fmt.Fprintf(os.Stderr, "警告: 記事本文が見つかりませんでした。タイトルのみで処理を続行します。\n")
 	}
 
 	// 抽出されたテキストを結合して返す

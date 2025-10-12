@@ -44,9 +44,9 @@ func init() {
 	// generateCmd をルートコマンドに追加
 	rootCmd.AddCommand(generateCmd)
 
-	// -i, --input-file フラグ (レガシー/汎用ファイル入力)
+	// -i, --input-file フラグ (互換性維持と汎用ファイル入力)
 	generateCmd.Flags().StringVarP(&inputFile, "input-file", "i", "",
-		"元となる文章が書かれたファイルのパス。省略時は標準入力 (stdin) を使用します。")
+		"元となる文章が書かれた汎用ファイルのパス。他の入力フラグとは同時に使用できません。")
 
 	// -o, --output-file フラグ
 	generateCmd.Flags().StringVarP(&outputFile, "output-file", "o", "",
@@ -65,8 +65,8 @@ func init() {
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
 
 	// 新しい入力フラグ
-	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "入力ソースURL (例: https://example.com/article)")
-	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルパス ('-'で標準入力) (例: script.txt)")
+	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "入力ソースURL (例: https://example.com/article)。他の入力フラグとは同時に使用できません。")
+	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'で標準入力)。他のファイル入力フラグとは同時に使用できません。")
 }
 
 // runGenerate は generate コマンドの実行ロジックです。
@@ -76,12 +76,31 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください。")
 	}
 
-	// --- 1. 入力元から文章を読み込む（新しい統合ロジック） ---
+	// --- 1. 入力元から文章を読み込む（統合ロジック） ---
 	var inputContent []byte
 	var err error
+	var inputSourceCount int
 
+	// 複数の入力フラグが指定された場合のカウント
+	// 標準入力("-" or デフォルト動作)は最後のelseブロックで処理するため、ここではカウントしない。
 	if scriptURL != "" {
-		// URLからの取得を最優先
+		inputSourceCount++
+	}
+	if scriptFile != "" && scriptFile != "-" {
+		inputSourceCount++
+	}
+	if inputFile != "" {
+		inputSourceCount++
+	}
+
+	// 複数の入力フラグが指定された場合はエラー
+	if inputSourceCount > 1 {
+		return fmt.Errorf("複数の入力ソース(-u, -f, -i)を同時に指定することはできません。いずれか一つのみを指定してください。")
+	}
+
+	// 実際の読み込みロジック
+	if scriptURL != "" {
+		// URLからの取得
 		fmt.Printf("URLからコンテンツを取得中: %s\n", scriptURL)
 		text, e := web.FetchAndExtractText(scriptURL, cmd.Context())
 		if e != nil {
@@ -89,32 +108,30 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}
 		inputContent = []byte(text)
 	} else if scriptFile != "" {
-		// 新しいスクリプトファイル/標準入力フラグ
-		fmt.Printf("スクリプトファイルから読み込み中: %s\n", scriptFile)
+		// 新しいスクリプトファイル/標準入力フラグ (-f)
 		if scriptFile == "-" {
+			fmt.Println("標準入力 (stdin) から読み込み中...")
 			inputContent, err = io.ReadAll(os.Stdin)
 		} else {
+			fmt.Printf("スクリプトファイルから読み込み中: %s\n", scriptFile)
 			inputContent, err = os.ReadFile(scriptFile)
 		}
 		if err != nil {
 			return fmt.Errorf("ファイルの読み込みに失敗しました: %w", err)
 		}
+	} else if inputFile != "" {
+		// 既存の inputFile フラグのロジック (-i)
+		fmt.Printf("入力ファイルから読み込み中: %s\n", inputFile)
+		inputContent, err = os.ReadFile(inputFile)
+		if err != nil {
+			return fmt.Errorf("ファイルの読み込みに失敗しました: %w", err)
+		}
 	} else {
-		// 既存の inputFile フラグのロジック（またはデフォルトの標準入力）
-		if inputFile != "" {
-			fmt.Printf("入力ファイルから読み込み中: %s\n", inputFile)
-			inputContent, err = os.ReadFile(inputFile)
-			if err != nil {
-				return fmt.Errorf("ファイルの読み込みに失敗しました: %w", err)
-			}
-		} else {
-			// フラグ指定なしの場合、標準入力から読み込み
-			fmt.Println("標準入力 (stdin) から読み込み中...")
-			inputContent, err = io.ReadAll(os.Stdin)
-			if err != nil {
-				// 標準入力からの読み込みエラーは致命的
-				return fmt.Errorf("標準入力の読み込みに失敗しました: %w", err)
-			}
+		// いずれのフラグも指定なしの場合、デフォルトで標準入力から読み込み
+		fmt.Println("標準入力 (stdin) から読み込み中...")
+		inputContent, err = io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("標準入力の読み込みに失敗しました: %w", err)
 		}
 	}
 
