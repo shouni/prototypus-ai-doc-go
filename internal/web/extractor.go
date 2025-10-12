@@ -60,9 +60,16 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 
 	// メインコンテンツが見つからなかった場合のフォールバックとノイズ除去の強化
 	if mainContent.Length() == 0 {
-		mainContent = doc.Selection.
-			// 一般的なノイズ要素（ヘッダー、フッター、ナビゲーション、サイドバーなど）を除外
-			Not("header, footer, nav, aside, .sidebar, .ad-banner, .advertisement")
+		// より具体的な代替セレクタを試す (例: 多くのブログで使われるクラス名)
+		// もしこれらのセレクタが見つかれば、より狭い範囲で抽出できる
+		alternativeContent := doc.Find(".post-content, .article-body, #content").First()
+		if alternativeContent.Length() > 0 {
+			mainContent = alternativeContent
+		} else {
+			// それでも見つからない場合に、一般的なノイズ要素を除外したドキュメント全体を対象とする
+			mainContent = doc.Selection.
+				Not("header, footer, nav, aside, .sidebar, .ad-banner, .advertisement, script, style, form") // script, style, formも追加
+		}
 	}
 
 	// 記事本体内の段落や見出しを取得し、テキストを結合
