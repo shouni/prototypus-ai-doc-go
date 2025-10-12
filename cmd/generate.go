@@ -20,7 +20,6 @@ const MinContentLength = 10 // AIに渡す最低限のコンテンツ長 (バイ
 
 // generateCmd のフラグ変数を定義
 var (
-	inputFile      string
 	outputFile     string
 	mode           string
 	postAPI        bool
@@ -43,12 +42,6 @@ func init() {
 
 	// --- 入力フラグ ---
 
-	// -i, --input-file フラグ (非推奨。互換性のために残す)
-	generateCmd.Flags().StringVarP(&inputFile, "input-file", "i", "",
-		"元となる文章が書かれたファイルのパス。--script-file に移行されました。")
-	generateCmd.Flags().MarkDeprecated("input-file", "use --script-file (-f) instead.")
-
-	// 新しい入力フラグ
 	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL (例: https://example.com/article)。")
 	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
 
@@ -116,12 +109,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}
 		if err != nil {
 			return fmt.Errorf("スクリプトファイル '%s' の読み込みに失敗しました: %w", scriptFile, err)
-		}
-
-	case inputFile != "": // 非推奨フラグだが、互換性のために残す
-		inputContent, err = readFileContent(inputFile) // ヘルパー関数を呼び出す
-		if err != nil {
-			return fmt.Errorf("入力ファイル '%s' の読み込みに失敗しました: %w", inputFile, err)
 		}
 
 	default:
