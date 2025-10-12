@@ -15,6 +15,8 @@ import (
 	"prototypus-ai-doc-go/internal/web"
 )
 
+const MinContentLength = 10 // AIに渡す最低限のコンテンツ長 (バイト数)
+
 // generateCmd のフラグ変数を定義
 var (
 	inputFile      string
@@ -29,44 +31,46 @@ var (
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
 	Use:   "generate",
-	Short: "文章を読み込み、ずんだもん/めたんの対話スクリプトを生成します。",
-	Long: `
-'generate' コマンドは、入力された文章を Gemini API に送り、
-指定されたモード（dialogue/solo/duet）に基づいて整形されたナレーションスクリプトを生成します。
-
-入力元を指定しない場合、標準入力 (stdin) から文章を読み込みます。
-出力先を指定しない場合、標準出力 (stdout) に結果を出力します。
-`,
+	Short: "AIにナレーションスクリプトを生成させます。",
+	Long: `AIに渡す元となる文章を指定し、ナレーションスクリプトを生成します。
+Webページやファイル、標準入力から文章を読み込むことができます。`,
 	RunE: runGenerate,
 }
 
 func init() {
-	// generateCmd をルートコマンドに追加
 	rootCmd.AddCommand(generateCmd)
 
-	// -i, --input-file フラグ (互換性維持と汎用ファイル入力)
+	// --- 入力フラグ ---
+
+	// -i, --input-file フラグ (非推奨。互換性のために残す)
 	generateCmd.Flags().StringVarP(&inputFile, "input-file", "i", "",
-		"元となる文章が書かれた汎用ファイルのパス。他の入力フラグとは同時に使用できません。")
+		"元となる文章が書かれたファイルのパス。--script-file に移行されました。")
+	generateCmd.Flags().MarkDeprecated("input-file", "use --script-file (-f) instead.")
+
+	// 新しい入力フラグ
+	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL (例: https://example.com/article)。")
+	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
+
+	// 入力フラグは相互に排他的であるとマーク (Cobraが自動でエラーチェックを行う)
+	generateCmd.MarkFlagsMutuallyExclusive("script-url", "script-file", "input-file")
+
+	// --- 出力/設定フラグ ---
 
 	// -o, --output-file フラグ
 	generateCmd.Flags().StringVarP(&outputFile, "output-file", "o", "",
-		"生成されたスクリプトの出力ファイル名 (例: out/script.md)。省略時は標準出力 (stdout) に出力します。")
+		"生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
 
 	// -m, --mode フラグ
-	generateCmd.Flags().StringVarP(&mode, "mode", "m", "solo",
-		"スクリプト生成モードを指定: 'dialogue' (ずんだもん/めたん対話), 'solo' (ずんだもんモノローグ), 'duet' (交互ナレーション)")
+	generateCmd.Flags().StringVarP(&mode, "mode", "m", "default",
+		"スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
 
 	// -p, --post-api フラグ
 	generateCmd.Flags().BoolVarP(&postAPI, "post-api", "p", false,
-		"生成されたスクリプトを外部APIに投稿します (環境変数 POST_API_URL が必要)。")
+		"生成されたスクリプトを外部APIに投稿します。")
 
 	// -v, --voicevox フラグの定義
 	generateCmd.Flags().StringVarP(&voicevoxOutput, "voicevox", "v", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
-
-	// 新しい入力フラグ
-	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "入力ソースURL (例: https://example.com/article)。他の入力フラグとは同時に使用できません。")
-	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'で標準入力)。他のファイル入力フラグとは同時に使用できません。")
 }
 
 // runGenerate は generate コマンドの実行ロジックです。
@@ -76,39 +80,29 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください。")
 	}
 
-	// --- 1. 入力元から文章を読み込む（統合ロジック） ---
+	// --- 1. 入力元から文章を読み込む（switchステートメントで簡素化） ---
 	var inputContent []byte
 	var err error
-	var inputSourceCount int
 
-	// 複数の入力フラグが指定された場合のカウント
-	// 標準入力("-" or デフォルト動作)は最後のelseブロックで処理するため、ここではカウントしない。
-	if scriptURL != "" {
-		inputSourceCount++
-	}
-	if scriptFile != "" && scriptFile != "-" {
-		inputSourceCount++
-	}
-	if inputFile != "" {
-		inputSourceCount++
-	}
-
-	// 複数の入力フラグが指定された場合はエラー
-	if inputSourceCount > 1 {
-		return fmt.Errorf("複数の入力ソース(-u, -f, -i)を同時に指定することはできません。いずれか一つのみを指定してください。")
-	}
-
-	// 実際の読み込みロジック
-	if scriptURL != "" {
-		// URLからの取得
+	// CobraのMutuallyExclusiveGroupにより、フラグ競合チェックは自動的に行われる
+	switch {
+	case scriptURL != "":
 		fmt.Printf("URLからコンテンツを取得中: %s\n", scriptURL)
-		text, e := web.FetchAndExtractText(scriptURL, cmd.Context())
-		if e != nil {
-			return fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", e)
+		var text string
+		var hasBodyFound bool
+
+		// webパッケージの修正後の関数を呼び出し、本文抽出フラグを受け取る
+		text, hasBodyFound, err = web.FetchAndExtractText(scriptURL, cmd.Context())
+		if err != nil {
+			return fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
+		}
+		if !hasBodyFound {
+			// 警告ログを上位レイヤーで処理
+			fmt.Fprintf(os.Stderr, "警告: 記事本文が見つかりませんでした。タイトルのみで処理を続行します。\n")
 		}
 		inputContent = []byte(text)
-	} else if scriptFile != "" {
-		// 新しいスクリプトファイル/標準入力フラグ (-f)
+
+	case scriptFile != "":
 		if scriptFile == "-" {
 			fmt.Println("標準入力 (stdin) から読み込み中...")
 			inputContent, err = io.ReadAll(os.Stdin)
@@ -117,17 +111,18 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 			inputContent, err = os.ReadFile(scriptFile)
 		}
 		if err != nil {
-			return fmt.Errorf("ファイルの読み込みに失敗しました: %w", err)
+			return fmt.Errorf("スクリプトファイル '%s' の読み込みに失敗しました: %w", scriptFile, err)
 		}
-	} else if inputFile != "" {
-		// 既存の inputFile フラグのロジック (-i)
+
+	case inputFile != "": // 非推奨フラグだが、互換性のために残す
 		fmt.Printf("入力ファイルから読み込み中: %s\n", inputFile)
 		inputContent, err = os.ReadFile(inputFile)
 		if err != nil {
-			return fmt.Errorf("ファイルの読み込みに失敗しました: %w", err)
+			return fmt.Errorf("入力ファイル '%s' の読み込みに失敗しました: %w", inputFile, err)
 		}
-	} else {
-		// いずれのフラグも指定なしの場合、デフォルトで標準入力から読み込み
+
+	default:
+		// いずれのフラグも指定なしの場合、標準入力から読み込み
 		fmt.Println("標準入力 (stdin) から読み込み中...")
 		inputContent, err = io.ReadAll(os.Stdin)
 		if err != nil {
@@ -136,12 +131,14 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	// 入力チェックを強化
-	if len(inputContent) == 0 {
-		return fmt.Errorf("エラー: 入力コンテンツが空です。文章を入力してください")
+	if len(inputContent) < MinContentLength {
+		return fmt.Errorf("入力されたコンテンツが短すぎます (最低%dバイト必要です)。", MinContentLength)
 	}
 
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, model, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
+
+	// ... (以降のAI処理、VOICEVOX、POST APIのロジックは変更なし) ...
 
 	// NewClient を使用してクライアントを初期化
 	aiClient, err := ai.NewClient(context.Background(), model)
