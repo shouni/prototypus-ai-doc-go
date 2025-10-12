@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
 // APIClient はVOICEVOXエンジンへのAPIリクエストを処理するクライアントです。
@@ -21,7 +22,9 @@ type APIClient struct {
 // エンタープライズ環境を想定し、接続レベルのタイムアウトを設定します。
 func NewAPIClient(apiURL string) *APIClient {
 	return &APIClient{
-		client: &http.Client{},
+		client: &http.Client{
+			Timeout: 120 * time.Second,
+		},
 		apiURL: apiURL,
 	}
 }
