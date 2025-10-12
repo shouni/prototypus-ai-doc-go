@@ -122,7 +122,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", voicevoxOutput)
 
 		// 修正後の呼び出し: speakerDataを引数として渡す
-		err = voicevox.PostToEngine(cmd.Context(), generatedScript, voicevoxOutput, speakerData)
+		err = voicevox.PostToEngine(cmd.Context(), generatedScript, voicevoxOutput, speakerData, voicevoxAPIURL)
 
 		if err != nil {
 			return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)

@@ -22,7 +22,11 @@ type resultSegment struct {
 	wavData []byte
 }
 
-const segmentTimeout = 120 * time.Second
+const (
+	maxParallelSegments = 15                // 同時実行セグメントの最大数
+	maxRetries          = 3                 // API呼び出しのリトライ回数
+	segmentTimeout      = 120 * time.Second // 1セグメントの処理に最大120秒を許容
+)
 
 // ----------------------------------------------------------------------
 // メイン処理 (PostToEngine)
@@ -30,8 +34,8 @@ const segmentTimeout = 120 * time.Second
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成するメイン関数です。
 // この関数は並列処理、リトライロジック、エラー集約を制御します。
-func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData) error {
-	apiURL := os.Getenv("VOICEVOX_API_URL")
+func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, apiURL string) error {
+
 	if apiURL == "" {
 		return fmt.Errorf("VOICEVOX_API_URL 環境変数が設定されていません")
 	}
@@ -136,13 +140,13 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 				}
 
 				// 責務の分離: APIClientに通信を委譲
-				queryBody, currentErr = client.runAudioQuery(seg.Text, styleID, ctx)
+				queryBody, currentErr = client.runAudioQuery(seg.Text, styleID, segCtx)
 				if currentErr != nil {
 					goto Retry
 				}
 
-				// 責務の分離: APIClientに通信を委譲
-				wavData, currentErr = client.runSynthesis(queryBody, styleID, ctx)
+				// ★ 修正箇所: segCtx を渡す
+				wavData, currentErr = client.runSynthesis(queryBody, styleID, segCtx)
 				if currentErr != nil {
 					goto Retry
 				}

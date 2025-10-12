@@ -92,8 +92,8 @@ func (c *APIClient) runSynthesis(queryBody []byte, styleID int, ctx context.Cont
 	}
 
 	// WAVEデータが空でないことを確認
-	if len(wavData) < WavTotalHeaderSize { // WavTotalHeaderSize は wav_utils.go で定義される定数を想定
-		return nil, fmt.Errorf("音声合成APIから無効な（短すぎる）WAVデータが返されました")
+	if len(wavData) < WavTotalHeaderSize {
+		return nil, fmt.Errorf("音声合成APIから無効な（短すぎる）WAVデータが返されました。サイズ: %d", len(wavData))
 	}
 
 	return wavData, nil
