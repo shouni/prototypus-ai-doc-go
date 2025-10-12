@@ -103,11 +103,29 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// 3. VOICEVOX出力の処理
 	if voicevoxOutput != "" {
+		voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
+		if voicevoxAPIURL == "" {
+			return fmt.Errorf("VOICEVOX_API_URL 環境変数が設定されていません")
+		}
+
+		// VOICEVOXスタイルデータ（話者情報）をロード
+		fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
+		// cmd.Context() を利用してロード処理もキャンセル可能にするのがベストだが、ここではシンプルに
+		speakerData, err := voicevox.LoadSpeakers(voicevoxAPIURL)
+		if err != nil {
+			return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータのロード完了。")
+		// ---------------------------------------------
+
 		// VOICEVOX出力が指定されている場合、合成処理を実行
 		fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", voicevoxOutput)
 
-		if err := voicevox.PostToEngine(generatedScript, voicevoxOutput); err != nil {
-			return fmt.Errorf("VOICEVOX音声合成に失敗しました: %w", err)
+		// 修正後の呼び出し: speakerDataを引数として渡す
+		err = voicevox.PostToEngine(cmd.Context(), generatedScript, voicevoxOutput, speakerData)
+
+		if err != nil {
+			return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 		}
 		fmt.Fprintln(os.Stderr, "VOICEVOXによる音声合成が完了し、ファイルに保存されました。")
 
