@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors" // errorsパッケージを追加
 	"fmt"
 	"io"
 	"os"
@@ -60,8 +61,8 @@ func init() {
 	generateCmd.Flags().StringVarP(&outputFile, "output-file", "o", "",
 		"生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
 
-	// -m, --mode フラグ
-	generateCmd.Flags().StringVarP(&mode, "mode", "m", "default",
+	// -m, --mode フラグ (デフォルト値を "solo" に戻す)
+	generateCmd.Flags().StringVarP(&mode, "mode", "m", "solo",
 		"スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
 
 	// -p, --post-api フラグ
@@ -71,6 +72,12 @@ func init() {
 	// -v, --voicevox フラグの定義
 	generateCmd.Flags().StringVarP(&voicevoxOutput, "voicevox", "v", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+}
+
+// readFileContent は指定されたファイルパスからコンテンツを読み込みます。
+func readFileContent(filePath string) ([]byte, error) {
+	fmt.Printf("ファイルから読み込み中: %s\n", filePath)
+	return os.ReadFile(filePath)
 }
 
 // runGenerate は generate コマンドの実行ロジックです。
@@ -84,14 +91,12 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	var inputContent []byte
 	var err error
 
-	// CobraのMutuallyExclusiveGroupにより、フラグ競合チェックは自動的に行われる
 	switch {
 	case scriptURL != "":
 		fmt.Printf("URLからコンテンツを取得中: %s\n", scriptURL)
 		var text string
 		var hasBodyFound bool
 
-		// webパッケージの修正後の関数を呼び出し、本文抽出フラグを受け取る
 		text, hasBodyFound, err = web.FetchAndExtractText(scriptURL, cmd.Context())
 		if err != nil {
 			return fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
@@ -107,16 +112,14 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 			fmt.Println("標準入力 (stdin) から読み込み中...")
 			inputContent, err = io.ReadAll(os.Stdin)
 		} else {
-			fmt.Printf("スクリプトファイルから読み込み中: %s\n", scriptFile)
-			inputContent, err = os.ReadFile(scriptFile)
+			inputContent, err = readFileContent(scriptFile) // ヘルパー関数を呼び出す
 		}
 		if err != nil {
 			return fmt.Errorf("スクリプトファイル '%s' の読み込みに失敗しました: %w", scriptFile, err)
 		}
 
 	case inputFile != "": // 非推奨フラグだが、互換性のために残す
-		fmt.Printf("入力ファイルから読み込み中: %s\n", inputFile)
-		inputContent, err = os.ReadFile(inputFile)
+		inputContent, err = readFileContent(inputFile) // ヘルパー関数を呼び出す
 		if err != nil {
 			return fmt.Errorf("入力ファイル '%s' の読み込みに失敗しました: %w", inputFile, err)
 		}
@@ -126,7 +129,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		fmt.Println("標準入力 (stdin) から読み込み中...")
 		inputContent, err = io.ReadAll(os.Stdin)
 		if err != nil {
-			return fmt.Errorf("標準入力の読み込みに失敗しました: %w", err)
+			// 標準入力が閉じられたことによるEOFや、その他のI/Oエラーを区別
+			if errors.Is(err, io.EOF) && len(inputContent) == 0 {
+				return fmt.Errorf("標準入力が空です。文章を入力してください。")
+			}
+			return fmt.Errorf("標準入力の読み込み中に予期せぬエラーが発生しました: %w", err)
 		}
 	}
 
@@ -137,8 +144,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, model, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
-
-	// ... (以降のAI処理、VOICEVOX、POST APIのロジックは変更なし) ...
 
 	// NewClient を使用してクライアントを初期化
 	aiClient, err := ai.NewClient(context.Background(), model)

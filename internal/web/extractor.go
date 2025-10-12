@@ -15,8 +15,8 @@ const DefaultHTTPTimeout = 30 * time.Second
 const MinParagraphLength = 20 // 短すぎる段落を除去するための最小文字数
 const MinHeadingLength = 3    // 短すぎる見出しを除去するための最小文字数 (見出しは短くても重要)
 
-// globalHTTPClient はコネクションプールを再利用するためにパッケージ内で共有されるHTTPクライアントです。
-var globalHTTPClient = &http.Client{
+// httpClient はコネクションプールを再利用するためにパッケージ内で共有されるHTTPクライアントです。
+var httpClient = &http.Client{
 	Timeout: DefaultHTTPTimeout,
 }
 
@@ -30,7 +30,7 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 	}
 
 	// グローバルクライアントを使用
-	resp, err := globalHTTPClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		// context.Canceled や context.DeadlineExceeded もここで捕捉される
 		return "", false, fmt.Errorf("HTTPリクエストエラー: %w", err)
@@ -57,9 +57,12 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 
 	// 2. 記事本文の抽出
 	mainContent := doc.Find("article, main, div[role='main']").First()
+
+	// メインコンテンツが見つからなかった場合のフォールバックとノイズ除去の強化
 	if mainContent.Length() == 0 {
-		// メインコンテナが見つからなかった場合、ボディ全体を対象にする
-		mainContent = doc.Selection
+		mainContent = doc.Selection.
+			// 一般的なノイズ要素（ヘッダー、フッター、ナビゲーション、サイドバーなど）を除外
+			Not("header, footer, nav, aside, .sidebar, .ad-banner, .advertisement")
 	}
 
 	// 記事本体内の段落や見出しを取得し、テキストを結合
@@ -81,7 +84,8 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 	})
 
 	if len(parts) == 0 {
-		return "", false, fmt.Errorf("記事本文とタイトルを抽出できませんでした。")
+		// タイトルも記事本文も抽出できなかった場合
+		return "", false, fmt.Errorf("Webページからタイトルも記事本文も抽出できませんでした。セレクタの調整が必要かもしれません。")
 	}
 
 	if len(parts) == 1 && strings.HasPrefix(parts[0], "【記事タイトル】") {
