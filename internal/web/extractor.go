@@ -82,7 +82,7 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 		text := strings.TrimSpace(s.Text())
 
 		// 見出しタグかどうかを判定
-		isHeading := goquery.NodeName(s) == "h1" || goquery.NodeName(s) == "h2" || goquery.NodeName(s) == "h3" || goquery.NodeName(s) == "h4"
+		isHeading := s.Is("h1, h2, h3, h4, h5, h6") // textExtractionTags に含まれるすべてに対応
 
 		if isHeading {
 			if len(text) > MinHeadingLength {
@@ -101,7 +101,7 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 		if len(parts) == 1 && strings.HasPrefix(parts[0], "【記事タイトル】") {
 			return strings.Join(parts, "\n\n"), false, nil
 		}
-		return "", false, fmt.Errorf("Webページからタイトルも記事本文も抽出できませんでした。セレクタの調整が必要かもしれません。")
+		return "", false, fmt.Errorf("webページからタイトルまたは記事本文を抽出できませんでした")
 	}
 
 	// 記事本文が抽出できた場合
