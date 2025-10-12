@@ -17,8 +17,7 @@ const (
 	MinHeadingLength     = 3
 	mainContentSelectors = "article, main, div[role='main'], #main, #content, .post-content, .article-body, .entry-content"
 	noiseSelectors       = ".related-posts, .social-share, .comments, .ad-banner, .advertisement"
-	// ★ 抽出対象に 'table' を追加
-	textExtractionTags = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, table"
+	textExtractionTags   = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, table"
 )
 
 var httpClient = &http.Client{
@@ -26,7 +25,7 @@ var httpClient = &http.Client{
 }
 
 func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyFound bool, err error) {
-	// (リクエスト部分などは変更なし)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return "", false, fmt.Errorf("リクエスト作成エラー: %w", err)
@@ -83,7 +82,7 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 		}
 
 		text := strings.TrimSpace(s.Text())
-		isHeading := goquery.NodeName(s) == "h1" || goquery.NodeName(s) == "h2" || goquery.NodeName(s) == "h3" || goquery.NodeName(s) == "h4"
+		isHeading := s.Is("h1, h2, h3, h4, h5, h6")
 
 		if isHeading {
 			if len(text) > MinHeadingLength {
@@ -101,7 +100,7 @@ func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyF
 		if len(parts) == 1 && strings.HasPrefix(parts[0], "【記事タイトル】") {
 			return strings.Join(parts, "\n\n"), false, nil
 		}
-		return "", false, fmt.Errorf("Webページからタイトルも記事本文も抽出できませんでした。セレクタの調整が必要かもしれません。")
+		return "", false, fmt.Errorf("webページからタイトルも記事本文も抽出できませんでした")
 	}
 
 	return strings.Join(parts, "\n\n"), true, nil
