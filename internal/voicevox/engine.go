@@ -52,11 +52,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(segments))
 	resultsChan := make(chan resultSegment, len(segments))
-
-	const maxConcurrency = 15
-	semaphore := make(chan struct{}, maxConcurrency)
-
-	const maxRetries = 3
+	semaphore := make(chan struct{}, maxParallelSegments)
 	const retryDelay = 2 * time.Second
 
 	// ===================================================================
