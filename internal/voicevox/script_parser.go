@@ -18,9 +18,9 @@ const emotionTagsPattern = `(解説|疑問|驚き|理解|落ち着き|断定|呼
 // スクリプト解析ロジック
 // ----------------------------------------------------------------------
 
-// parseScript は AIが出力したスクリプトテキストをセグメントに分割します。
+// scriptSegment は engine.go で定義されたものを利用します。
 // [話者タグ][スタイルタグ] [演出タグ] テキスト の形式を想定しています。
-// Note: scriptSegment と AllowedSpeakerTags は engine.go または speaker_data.go で定義されたものを利用します。
+// Note: この関数は形式の解析のみを行い、タグの有効性チェックは engine.go に委譲します。
 func parseScript(script string) []scriptSegment {
 	// 最初の2つのタグを抽出する正規表現（例: [ずんだもん][ノーマル]）。
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)

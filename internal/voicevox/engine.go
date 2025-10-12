@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"regexp"
+	"regexp" // ★ 修正: タグ解析ロジックのために再導入
 	"strings"
 	"sync"
 	"time"
@@ -52,7 +52,11 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(segments))
 	resultsChan := make(chan resultSegment, len(segments))
+
+	// ★ 修正 1: maxParallelSegments を使用 (ローカル定数 maxConcurrency を削除)
 	semaphore := make(chan struct{}, maxParallelSegments)
+
+	// ★ 修正 2: maxRetries のローカル定義を削除。retryDelay は残す。
 	const retryDelay = 2 * time.Second
 
 	// ===================================================================
@@ -86,6 +90,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 				return
 			}
 
+			// ★ 修正 3: sendError をここで定義
 			// 非ブロッキングでエラーを送信するヘルパー関数
 			sendError := func(err error) {
 				select {
@@ -94,8 +99,12 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 				}
 			}
 
+			// ★ 修正 4: styleID をここで定義
+			var styleID int
+			var ok bool
+
 			// 1. スタイルIDの動的な検索とフォールバック処理
-			styleID, ok := speakerData.StyleIDMap[seg.SpeakerTag]
+			styleID, ok = speakerData.StyleIDMap[seg.SpeakerTag]
 			if !ok {
 				// 話者タグのみを抽出（例: [ずんだもん]）
 				reSpeaker := regexp.MustCompile(`^(\[.+?\])`)
@@ -115,6 +124,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 					"fallback_key", fallbackKey)
 
 				if defaultOk {
+					// ★ styleID はすでに定義されているため、ここでは 'styleID, _ =' ではなく 'styleID =' で代入
 					styleID, _ = speakerData.StyleIDMap[fallbackKey] // 存在することはLoadSpeakersで確認済み
 				} else {
 					sendError(fmt.Errorf("話者・スタイルタグ %s (およびデフォルトスタイル) に対応するStyle IDが見つかりません (セグメント %d)", seg.SpeakerTag, i))
@@ -126,48 +136,57 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 			var queryBody []byte
 			var wavData []byte
 			var currentErr error
+			var success bool // 成功フラグの追加
 
 			for attempt := 1; attempt <= maxRetries; attempt++ {
 
 				// コンテキストのキャンセルをチェック
-				if segCtx.Err() != nil { // ★ segCtx の使用例 1
+				if segCtx.Err() != nil {
 					slog.Info("処理がキャンセルされました...", "segment_index", i)
 					return
 				}
 
-				// 責務の分離: APIClientに通信を委譲
+				// API呼び出し (query と synthesis) を実行
 				queryBody, currentErr = client.runAudioQuery(seg.Text, styleID, segCtx)
-				if currentErr != nil {
-					goto Retry
+				if currentErr == nil {
+					wavData, currentErr = client.runSynthesis(queryBody, styleID, segCtx)
 				}
 
-				// ★ 修正箇所: segCtx を渡す
-				wavData, currentErr = client.runSynthesis(queryBody, styleID, segCtx)
-				if currentErr != nil {
-					goto Retry
+				// 成功した場合
+				if currentErr == nil {
+					success = true
+					break // 成功したのでループを抜ける
 				}
 
-				// 成功
-				break
-
-				// リトライ処理のラベル
-			Retry:
+				// 失敗した場合のリトライ判定 (goto の代替ロジック)
 				if attempt < maxRetries {
 					textSnippet := seg.Text
 					if len(textSnippet) > 20 {
 						textSnippet = textSnippet[:20] + "..."
 					}
+
+					// 指数バックオフの計算: baseDelay (2s) * 2^(attempt-1)
+					backoffDelay := retryDelay * time.Duration(1<<(attempt-1))
+
 					slog.WarnContext(ctx, "APIリクエストエラー。リトライします",
 						"segment_index", i,
 						"text", textSnippet,
 						"attempt", attempt,
 						"max_retries", maxRetries,
-						"error", currentErr)
-					time.Sleep(retryDelay) // 指数バックオフなどの改善余地あり
-					continue
+						"error", currentErr,
+						"delay", backoffDelay) // 遅延時間をログに追加
+
+					time.Sleep(backoffDelay)
+					continue // 次の試行へ
 				}
+
 				// 最終試行で失敗
 				sendError(fmt.Errorf("セグメント %d のAPIリクエストが連続失敗: %w", i, currentErr))
+				return // 最終的に失敗したのでGoroutineを終了
+			}
+
+			// 成功しなかった場合は、すでに sendError が呼ばれているため return
+			if !success {
 				return
 			}
 

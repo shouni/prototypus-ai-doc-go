@@ -24,16 +24,27 @@ const (
 	// VOICEVOXのスタイル名と一致させる定数
 	VvTagNormal   = "[ノーマル]"
 	VvTagAmaama   = "[あまあま]"
-	VvTagTsuntusn = "[ツンツン]"
+	VvTagTsuntsun = "[ツンツン]"
 	VvTagSexy     = "[セクシー]"
-	VvTagWhisper  = "[ささやき]" // ささやきタグを追加
-	// VvTagHisoHiso = "[ヒソヒソ]" // 必要に応じて追加
+	VvTagWhisper  = "[ささやき]" // ささやきタグ
+	// 必要に応じて、さらに "ヒソヒソ", "ヘロヘロ", "なみだめ" などを追加可能
 )
 
 // VOICEVOX APIで使われる名前を、ツールの内部タグに変換するためのマッピング
 var apiNameToToolTag = map[string]string{
 	"四国めたん": SpeakerTagMetan,    // VOICEVOX API "四国めたん" -> ツールタグ "[めたん]"
 	"ずんだもん": SpeakerTagZundamon, // VOICEVOX API "ずんだもん" -> ツールタグ "[ずんだもん]"
+}
+
+// ★ 修正: VOICEVOX APIのスタイル名からツールのタグ定数へのマッピングを追加
+// これにより、VvTagAmaamaなどの定数が LoadSpeakers で利用される
+var styleApiNameToToolTag = map[string]string{
+	"ノーマル": VvTagNormal,
+	"あまあま": VvTagAmaama,
+	"ツンツン": VvTagTsuntsun,
+	"セクシー": VvTagSexy,
+	"ささやき": VvTagWhisper,
+	// 必要に応じて、他のスタイル名（例: "あんぐり" -> VvTagAngry）もここに追加する
 }
 
 // ----------------------------------------------------------------------
@@ -93,7 +104,15 @@ func LoadSpeakers(apiURL string) (*SpeakerData, error) {
 		}
 
 		for _, style := range spk.Styles {
-			styleTag := "[" + style.Name + "]"
+			// ★ 修正: API名からツールタグ定数へ変換
+			styleTag, tagExists := styleApiNameToToolTag[style.Name]
+
+			// ツールがサポートしていないスタイルは無視
+			if !tagExists {
+				slog.Debug("サポートされていないスタイルをスキップします", "speaker", spk.Name, "style", style.Name)
+				continue
+			}
+
 			combinedTag := toolTag + styleTag // 例: "[めたん][ノーマル]"
 
 			// スタイルIDのマップに追加
