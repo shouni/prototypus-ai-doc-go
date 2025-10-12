@@ -14,6 +14,11 @@ import (
 // VOICEVOXトーンタグ（[ノーマル]など）も、3番目の位置に誤って挿入された場合に除去するため含める。
 const emotionTagsPattern = `(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ|納得|通常|喜び|怒り|ノーマル|あまあま|ツンツン|セクシー|ヒソヒソ|ささやき)`
 
+var (
+	reScriptParse  = regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
+	reEmotionParse = regexp.MustCompile(`\[` + emotionTagsPattern + `\]`)
+)
+
 // ----------------------------------------------------------------------
 // スクリプト解析ロジック
 // ----------------------------------------------------------------------
@@ -22,13 +27,6 @@ const emotionTagsPattern = `(解説|疑問|驚き|理解|落ち着き|断定|呼
 // [話者タグ][スタイルタグ] [演出タグ] テキスト の形式を想定しています。
 // Note: この関数は形式の解析のみを行い、タグの有効性チェックは engine.go に委譲します。
 func parseScript(script string) []scriptSegment {
-	// 最初の2つのタグを抽出する正規表現（例: [ずんだもん][ノーマル]）。
-	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
-
-	// 感情タグと誤挿入されたスタイルタグを除去するための正規表現
-	// 例: [解説]、[納得]、[通常]、[ツンツン] など
-	reEmotion := regexp.MustCompile(`\[` + emotionTagsPattern + `\]`)
-
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
 
@@ -38,7 +36,8 @@ func parseScript(script string) []scriptSegment {
 			continue
 		}
 
-		matches := re.FindStringSubmatch(line)
+		// パッケージレベルの変数を使用
+		matches := reScriptParse.FindStringSubmatch(line)
 		if len(matches) > 3 {
 			speakerTag := matches[1]
 			vvStyleTag := matches[2]
@@ -46,8 +45,8 @@ func parseScript(script string) []scriptSegment {
 
 			combinedTag := speakerTag + vvStyleTag
 
-			// 3番目の位置に存在するタグ（演出タグまたは誤挿入されたタグ）を除去
-			text := reEmotion.ReplaceAllString(textWithEmotion, "")
+			// パッケージレベルの変数を使用
+			text := reEmotionParse.ReplaceAllString(textWithEmotion, "")
 			text = strings.TrimSpace(text)
 
 			if text != "" {

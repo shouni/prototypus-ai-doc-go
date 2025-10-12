@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"regexp" // ★ 修正: タグ解析ロジックのために再導入
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -36,14 +36,7 @@ const (
 // この関数は並列処理、リトライロジック、エラー集約を制御します。
 func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, apiURL string) error {
 
-	if apiURL == "" {
-		return fmt.Errorf("VOICEVOX_API_URL 環境変数が設定されていません")
-	}
-
-	// 責務の分離: APIクライアントの初期化
 	client := NewAPIClient(apiURL)
-
-	// 責務の分離: スクリプトの解析
 	segments := parseScript(scriptContent)
 	if len(segments) == 0 {
 		return fmt.Errorf("スクリプトから有効なセグメントを抽出できませんでした。AIの出力形式が [話者タグ][スタイルタグ] テキスト の形式に沿っているか確認してください")
