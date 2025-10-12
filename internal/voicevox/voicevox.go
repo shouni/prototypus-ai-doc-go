@@ -25,23 +25,28 @@ const (
 )
 
 const (
-	VvTagNormal   = "[通常]"
-	VvTagHappy    = "[喜び]"
-	VvTagAngry    = "[怒り]"
+	VvTagNormal   = "[ノーマル]"
+	VvTagAmaama   = "[あまあま]"
+	VvTagTsuntusn = "[ツンツン]"
 	VvTagWhisper  = "[ささやき]"
-	VvTagGrasping = "[納得]"
+	VvTagSexy     = "[セクシー]"
+	// VvTagGrasping = "[納得]" は廃止
 )
 
-// StyleIDMappingsに [ずんだもん][納得] を追加（IDを20から35に変更）
 var StyleIDMappings = map[string]int{
-	SpeakerTagZundamon + VvTagNormal:   3,
-	SpeakerTagZundamon + VvTagHappy:    1,
-	SpeakerTagZundamon + VvTagAngry:    4,
-	SpeakerTagZundamon + VvTagWhisper:  18,
-	SpeakerTagZundamon + VvTagGrasping: 35, // ★ 2. 仮のStyle IDをより確度の高い35に変更
-	SpeakerTagMetan + VvTagNormal:      2,
-	SpeakerTagMetan + VvTagHappy:       15,
-	SpeakerTagMetan + VvTagAngry:       17,
+	// 【ずんだもん】
+	SpeakerTagZundamon + VvTagNormal:   3,  // ノーマル
+	SpeakerTagZundamon + VvTagAmaama:   1,  // あまあま
+	SpeakerTagZundamon + VvTagTsuntusn: 7,  // ツンツン
+	SpeakerTagZundamon + VvTagWhisper:  22, // ささやき
+	SpeakerTagZundamon + VvTagSexy:     5,  // セクシー
+
+	// 【めたん】
+	SpeakerTagMetan + VvTagNormal:   2,  // ノーマル
+	SpeakerTagMetan + VvTagAmaama:   0,  // あまあま
+	SpeakerTagMetan + VvTagTsuntusn: 6,  // ツンツン
+	SpeakerTagMetan + VvTagWhisper:  36, // ささやき
+	SpeakerTagMetan + VvTagSexy:     4,  // セクシー
 }
 
 // 許可された話者タグを定義 (parseScriptで使用)
@@ -323,9 +328,7 @@ func parseScript(script string) []scriptSegment {
 	re := regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 
 	// 感情タグを除去するための正規表現
-	reEmotion := regexp.MustCompile(
-		`\[(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ|納得|通常|喜び|怒り|ささやき)\]`,
-	)
+	reEmotion := regexp.MustCompile(`\[(解説|疑問|驚き|理解|落ち着き|断定|呼びかけ|納得|通常|喜び|怒り|ノーマル|あまあま|ツンツン|セクシー|ヒソヒソ|ささやき)\]`)
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
 
