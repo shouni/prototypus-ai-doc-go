@@ -101,7 +101,7 @@ prototypus-ai-doc generate [flags]
 
 #### フラグ一覧
 
-入力ソースは **`--script-url`, `--script-file`, `--input-file` のいずれか一つのみ**指定可能です。
+入力ソースは **`--script-url`, `--script-file` のいずれか一つのみ**指定可能です。
 
 | フラグ | 短縮形 | 説明 |
 | :--- | :--- | :--- |
