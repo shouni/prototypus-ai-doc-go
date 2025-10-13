@@ -5,9 +5,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"text/template"
-
 	"prototypus-ai-doc-go/internal/prompt"
+	"text/template"
 
 	"google.golang.org/genai"
 )
@@ -42,9 +41,8 @@ func NewClient(ctx context.Context, modelName string) (*Client, error) {
 	}, nil
 }
 
-// GenerateScript はナレーションスクリプトを生成します。
-func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode string) (string, error) {
-
+// buildPrompt は指定されたモードと入力内容に基づいて、APIに渡すプロンプト文字列を構築します。
+func buildPrompt(inputContent []byte, mode string) (string, error) {
 	// 1. プロンプトのテンプレートを取得
 	promptTemplateString, err := prompt.GetPromptByMode(mode)
 	if err != nil {
@@ -54,21 +52,24 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 	// 2. プロンプトにユーザーの入力テキストを埋め込む
 	type InputData struct{ InputText string }
 
+	// テンプレートの解析
 	tmpl, err := template.New("narration_prompt").Parse(promptTemplateString)
 	if err != nil {
 		return "", fmt.Errorf("プロンプトテンプレートの解析エラー: %w", err)
 	}
 
+	// データの埋め込み
 	data := InputData{InputText: string(inputContent)}
 	var fullPrompt bytes.Buffer
 	if err := tmpl.Execute(&fullPrompt, data); err != nil {
 		return "", fmt.Errorf("プロンプトへの入力埋め込みエラー: %w", err)
 	}
 
-	finalPrompt := fullPrompt.String()
+	return fullPrompt.String(), nil
+}
 
-	// 3. API呼び出し
-
+// callGenerateContent はAPIを呼び出し、レスポンスからテキストを抽出します。
+func (c *Client) callGenerateContent(ctx context.Context, finalPrompt string) (string, error) {
 	// 入力コンテンツを作成
 	contents := []*genai.Content{
 		{
@@ -93,27 +94,41 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 
 	// 4. レスポンスの処理
 	if resp == nil || len(resp.Candidates) == 0 {
-		return "", fmt.Errorf("received empty or invalid response from Gemini API")
+		return "", fmt.Errorf("Gemini APIから空または無効なレスポンスが返されました")
 	}
 
 	candidate := resp.Candidates[0]
 
+	// 安全性チェック: レスポンスがブロックされていないか確認
 	if candidate.FinishReason != genai.FinishReasonUnspecified && candidate.FinishReason != genai.FinishReasonStop {
-		// FinishReason.String() が無い問題を回避するため、%v を使用
-		return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %v", candidate.FinishReason)
+		return "", fmt.Errorf("APIレスポンスがブロックされたか、途中で終了しました。理由: %v", candidate.FinishReason)
 	}
 
-	// その後、コンテンツの有無をチェック
+	// コンテンツの有無をチェック
 	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-		return "", fmt.Errorf("gemini response candidate is empty or lacks content parts")
+		return "", fmt.Errorf("Gemini レスポンスのコンテンツが空です")
 	}
 
 	firstPart := candidate.Content.Parts[0]
 
-	// Textフィールドの値を直接返す
+	// Textフィールドの値をチェック
 	if firstPart.Text == "" {
-		return "", fmt.Errorf("API returned non-text part in response or text field is empty")
+		// non-text part (e.g., image) の可能性を考慮
+		return "", fmt.Errorf("APIは非テキスト形式の応答を返したか、テキストフィールドが空です")
 	}
 
 	return firstPart.Text, nil
+}
+
+// GenerateScript はナレーションスクリプトを生成します。
+func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode string) (string, error) {
+
+	// 1. プロンプトの構築
+	finalPrompt, err := buildPrompt(inputContent, mode)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. API呼び出しとレスポンスの処理
+	return c.callGenerateContent(ctx, finalPrompt)
 }

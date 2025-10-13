@@ -96,24 +96,19 @@ func LoadSpeakers(ctx context.Context, apiURL string) (*SpeakerData, error) {
 		// API名 ("四国めたん"など) から、ツールのタグ ("[めたん]"など) を取得
 		toolTag, tagFound := apiNameToToolTag[spk.Name]
 
-		// ツールの想定する話者名に含まれていない場合はスキップ
 		if !tagFound {
 			continue
 		}
 
 		for _, style := range spk.Styles {
-			// ★ 修正: API名からツールタグ定数へ変換
-			styleTag, tagExists := styleApiNameToToolTag[style.Name]
 
-			// ツールがサポートしていないスタイルは無視
+			styleTag, tagExists := styleApiNameToToolTag[style.Name]
 			if !tagExists {
 				slog.Debug("サポートされていないスタイルをスキップします", "speaker", spk.Name, "style", style.Name)
 				continue
 			}
 
 			combinedTag := toolTag + styleTag // 例: "[めたん][ノーマル]"
-
-			// スタイルIDのマップに追加
 			data.StyleIDMap[combinedTag] = style.ID
 
 			// VvTagNormal ([ノーマル]) スタイルをデフォルトとして登録

@@ -31,15 +31,13 @@ func PostToAPI(title string, mode string, scriptContent string) error {
 		Content:   scriptContent,
 	}
 
-	// ★ 修正点1: JSONマーシャリングのエラーチェック
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("JSONマーシャリングに失敗しました: %w", err)
 	}
 
-	// ★ 修正点2: タイムアウトを設定したHTTPクライアントを作成
 	client := &http.Client{
-		Timeout: 15 * time.Second, // 例: 15秒のタイムアウトを設定 (API投稿はAI生成より短い時間で完了すべき)
+		Timeout: 15 * time.Second,
 	}
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(payloadBytes))
