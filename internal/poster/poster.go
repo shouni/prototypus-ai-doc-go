@@ -37,7 +37,7 @@ func PostToAPI(title string, mode string, scriptContent string) error {
 	}
 
 	client := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 15 * time.Second,
 	}
 
 	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(payloadBytes))
