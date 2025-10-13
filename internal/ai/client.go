@@ -20,7 +20,7 @@ type Client struct {
 
 // NewClient はGeminiClientを初期化します。ctxを引数に追加
 func NewClient(ctx context.Context, modelName string) (*Client, error) {
-	// 1. APIキーの取得ロジックを復元
+	// 1. APIキーの取得
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable is not set")
@@ -69,7 +69,6 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 	finalPrompt := fullPrompt.String()
 
 	// 3. API呼び出し（古いAPI引数形式に合わせる）
-	// want (context.Context, string, []*genai.Content, *genai.GenerateContentConfig)
 
 	// 入力コンテンツを作成
 	contents := []*genai.Content{
@@ -81,12 +80,12 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 		},
 	}
 
-	// API呼び出しを実行
+	// API呼び出しを実行 (want (context.Context, string, []*genai.Content, *genai.GenerateContentConfig) に準拠)
 	resp, err := c.client.Models.GenerateContent(
 		ctx,
-		c.modelName, // 1st argument: モデル名 (string)
-		contents,    // 2nd argument: コンテンツスライス ([]*genai.Content)
-		nil,         // 3rd argument: コンフィグ (*genai.GenerateContentConfig)。今回はnilで省略
+		c.modelName,
+		contents,
+		nil,
 	)
 
 	if err != nil {
@@ -101,7 +100,7 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 	candidate := resp.Candidates[0]
 
 	if candidate.FinishReason != genai.FinishReasonUnspecified && candidate.FinishReason != genai.FinishReasonStop {
-		// FinishReason.String() が無い問題を回避するため、%v を使用して文字列化します
+		// FinishReason.String() が無い問題を回避するため、%v を使用
 		return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %v", candidate.FinishReason)
 	}
 
@@ -110,13 +109,11 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
 	}
 
-	// candidate.Content.Parts[0] の型は *genai.Part (ポインター) です。
-	// そのため、Textフィールドに直接アクセスします。
+	// candidate.Content.Parts[0] の型が *genai.Part (ポインター) であることを利用
 	firstPart := candidate.Content.Parts[0]
 
-	// Textフィールドが存在するかどうかを確認（構造体のTextフィールドを直接参照）
+	// Textフィールドの値を直接返す
 	if firstPart.Text == "" {
-		// Textフィールドが無い、または空の場合
 		return "", fmt.Errorf("API returned non-text part in response or text field is empty")
 	}
 
