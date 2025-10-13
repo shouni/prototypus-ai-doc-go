@@ -7,12 +7,17 @@ import (
 	"os"
 	"text/template"
 
+	// AIプロンプトの定義をインポート
 	"prototypus-ai-doc-go/internal/prompt"
 
 	"google.golang.org/genai"
 )
 
 // Client はGemini APIとの通信を管理します。
+// 古い SDK で存在した Client.Close() メソッドは、
+// 新しい Google Gemini Go SDK (google.golang.org/genai) のクライアントが
+// Close() メソッドを持たないため削除されました。
+// リソース管理は SDK 内部で行われます。
 type Client struct {
 	client    *genai.Client
 	modelName string
@@ -27,7 +32,8 @@ func NewClient(ctx context.Context, modelName string) (*Client, error) {
 	}
 
 	// 2. クライアントの作成
-	// *genai.ClientConfig を引数に取る形式に対応 (以前のエラーに基づく修正)
+	// SDKのバージョンアップに伴うAPI仕様の変更に対応するため、
+	// genai.NewClient の引数を *genai.ClientConfig 形式に変更しています。
 	clientConfig := &genai.ClientConfig{
 		APIKey: apiKey,
 	}
@@ -68,7 +74,7 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 
 	finalPrompt := fullPrompt.String()
 
-	// 3. API呼び出し（古いAPI引数形式に合わせる）
+	// 3. API呼び出し
 
 	// 入力コンテンツを作成
 	contents := []*genai.Content{
@@ -83,8 +89,9 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 	// API呼び出しを実行 (want (context.Context, string, []*genai.Content, *genai.GenerateContentConfig) に準拠)
 	resp, err := c.client.Models.GenerateContent(
 		ctx,
-		c.modelName,
-		contents,
+		c.modelName, // 1st argument: モデル名 (string)
+		contents,    // 2nd argument: コンテンツスライス ([]*genai.Content)
+		// 3rd argument: コンフィグ (*genai.GenerateContentConfig)。今回はnilで省略可能だが、生成設定（温度、トークン制限など）が必要な場合に利用。
 		nil,
 	)
 
@@ -92,7 +99,7 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 		return "", fmt.Errorf("GenerateContent failed with model %s: %w", c.modelName, err)
 	}
 
-	// 4. レスポンスの処理 (古いSDKの型に合わせて修正)
+	// 4. レスポンスの処理
 	if resp == nil || len(resp.Candidates) == 0 {
 		return "", fmt.Errorf("received empty or invalid response from Gemini API")
 	}
@@ -109,7 +116,6 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
 	}
 
-	// candidate.Content.Parts[0] の型が *genai.Part (ポインター) であることを利用
 	firstPart := candidate.Content.Parts[0]
 
 	// Textフィールドの値を直接返す
