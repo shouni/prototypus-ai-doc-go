@@ -134,7 +134,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
-	defer aiClient.Close() // クライアントを確実に閉じる
 
 	generatedScript, err := aiClient.GenerateScript(context.Background(), inputContent, mode)
 	if err != nil {

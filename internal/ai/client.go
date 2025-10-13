@@ -7,13 +7,17 @@ import (
 	"os"
 	"text/template"
 
-	"prototypus-ai-doc-go/internal/prompt" // 組み込みプロンプトを取得
+	// AIプロンプトの定義をインポート
+	"prototypus-ai-doc-go/internal/prompt"
 
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"google.golang.org/genai"
 )
 
 // Client はGemini APIとの通信を管理します。
+// 古い SDK で存在した Client.Close() メソッドは、
+// 新しい Google Gemini Go SDK (google.golang.org/genai) のクライアントが
+// Close() メソッドを持たないため削除されました。
+// リソース管理は SDK 内部で行われます。
 type Client struct {
 	client    *genai.Client
 	modelName string
@@ -28,8 +32,13 @@ func NewClient(ctx context.Context, modelName string) (*Client, error) {
 	}
 
 	// 2. クライアントの作成
-	// ctx を genai.NewClient に渡す
-	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	// SDKのバージョンアップに伴うAPI仕様の変更に対応するため、
+	// genai.NewClient の引数を *genai.ClientConfig 形式に変更しています。
+	clientConfig := &genai.ClientConfig{
+		APIKey: apiKey,
+	}
+
+	client, err := genai.NewClient(ctx, clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
@@ -38,13 +47,6 @@ func NewClient(ctx context.Context, modelName string) (*Client, error) {
 		client:    client,
 		modelName: modelName,
 	}, nil
-}
-
-// Close はクライアントを閉じ、リソースを解放します。
-func (c *Client) Close() {
-	if c.client != nil {
-		c.client.Close() // 以前の動作確認済みコードの通り、このメソッドは存在します
-	}
 }
 
 // GenerateScript はナレーションスクリプトを生成します。
@@ -57,9 +59,6 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 	}
 
 	// 2. プロンプトにユーザーの入力テキストを埋め込む
-	// 入力はコード差分ではなく、InputTextとして埋め込みます
-
-	// テンプレートの定義（ナレーションスクリプト生成用）
 	type InputData struct{ InputText string }
 
 	tmpl, err := template.New("narration_prompt").Parse(promptTemplateString)
@@ -75,14 +74,32 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 
 	finalPrompt := fullPrompt.String()
 
-	// 3. API呼び出し (提供コードのロジックを流用)
-	model := c.client.GenerativeModel(c.modelName)
-	resp, err := model.GenerateContent(ctx, genai.Text(finalPrompt))
+	// 3. API呼び出し
+
+	// 入力コンテンツを作成
+	contents := []*genai.Content{
+		{
+			Role: "user",
+			Parts: []*genai.Part{
+				{Text: finalPrompt},
+			},
+		},
+	}
+
+	// API呼び出しを実行 (want (context.Context, string, []*genai.Content, *genai.GenerateContentConfig) に準拠)
+	resp, err := c.client.Models.GenerateContent(
+		ctx,
+		c.modelName, // 1st argument: モデル名 (string)
+		contents,    // 2nd argument: コンテンツスライス ([]*genai.Content)
+		// 3rd argument: コンフィグ (*genai.GenerateContentConfig)。今回はnilで省略可能だが、生成設定（温度、トークン制限など）が必要な場合に利用。
+		nil,
+	)
+
 	if err != nil {
 		return "", fmt.Errorf("GenerateContent failed with model %s: %w", c.modelName, err)
 	}
 
-	// 4. レスポンスの処理 (提供コードのロジックを流用)
+	// 4. レスポンスの処理
 	if resp == nil || len(resp.Candidates) == 0 {
 		return "", fmt.Errorf("received empty or invalid response from Gemini API")
 	}
@@ -90,8 +107,8 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 	candidate := resp.Candidates[0]
 
 	if candidate.FinishReason != genai.FinishReasonUnspecified && candidate.FinishReason != genai.FinishReasonStop {
-		// FinishReasonStop (正常終了) 以外の理由で停止した場合
-		return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %s", candidate.FinishReason.String())
+		// FinishReason.String() が無い問題を回避するため、%v を使用
+		return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %v", candidate.FinishReason)
 	}
 
 	// その後、コンテンツの有無をチェック
@@ -99,10 +116,12 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
 	}
 
-	reviewText, ok := candidate.Content.Parts[0].(genai.Text)
-	if !ok {
-		return "", fmt.Errorf("API returned non-text part in response")
+	firstPart := candidate.Content.Parts[0]
+
+	// Textフィールドの値を直接返す
+	if firstPart.Text == "" {
+		return "", fmt.Errorf("API returned non-text part in response or text field is empty")
 	}
 
-	return string(reviewText), nil
+	return firstPart.Text, nil
 }
