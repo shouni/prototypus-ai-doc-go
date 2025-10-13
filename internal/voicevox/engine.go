@@ -22,6 +22,8 @@ const (
 	retryDelay          = 2 * time.Second   // リトライ時の初期遅延
 )
 
+var reSpeaker = regexp.MustCompile(`^(\[.+?\])`)
+
 // スクリプト解析用
 type scriptSegment struct {
 	SpeakerTag string // 例: "[ずんだもん][ノーマル]"
@@ -49,8 +51,6 @@ func determineStyleID(ctx context.Context, seg scriptSegment, speakerData *Speak
 	}
 
 	// 2. フォールバック処理: デフォルトスタイルを試す
-	// 話者タグのみを抽出（例: [ずんだもん]）
-	reSpeaker := regexp.MustCompile(`^(\[.+?\])`)
 	speakerMatch := reSpeaker.FindStringSubmatch(seg.SpeakerTag)
 
 	if len(speakerMatch) < 2 {
