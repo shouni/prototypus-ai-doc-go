@@ -17,7 +17,7 @@ const (
 	DefaultHTTPTimeout   = 30 * time.Second
 	MinParagraphLength   = 20
 	MinHeadingLength     = 3
-	mainContentSelectors = "article, main, div[role='main'], #main, #content, .post-content, .article-body, .entry-content"
+	mainContentSelectors = "article, main, div[role='main'], #main, #content, .post-content, .article-body, .entry-content, .markdown-body, .readme"
 	noiseSelectors       = ".related-posts, .social-share, .comments, .ad-banner, .advertisement"
 	textExtractionTags   = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre"
 	userAgent            = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
