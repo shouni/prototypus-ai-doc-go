@@ -7,17 +7,12 @@ import (
 	"os"
 	"text/template"
 
-	// AIプロンプトの定義をインポート
 	"prototypus-ai-doc-go/internal/prompt"
 
 	"google.golang.org/genai"
 )
 
 // Client はGemini APIとの通信を管理します。
-// 古い SDK で存在した Client.Close() メソッドは、
-// 新しい Google Gemini Go SDK (google.golang.org/genai) のクライアントが
-// Close() メソッドを持たないため削除されました。
-// リソース管理は SDK 内部で行われます。
 type Client struct {
 	client    *genai.Client
 	modelName string
@@ -32,8 +27,6 @@ func NewClient(ctx context.Context, modelName string) (*Client, error) {
 	}
 
 	// 2. クライアントの作成
-	// SDKのバージョンアップに伴うAPI仕様の変更に対応するため、
-	// genai.NewClient の引数を *genai.ClientConfig 形式に変更しています。
 	clientConfig := &genai.ClientConfig{
 		APIKey: apiKey,
 	}
@@ -86,12 +79,11 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 		},
 	}
 
-	// API呼び出しを実行 (want (context.Context, string, []*genai.Content, *genai.GenerateContentConfig) に準拠)
+	// API呼び出しを実行
 	resp, err := c.client.Models.GenerateContent(
 		ctx,
-		c.modelName, // 1st argument: モデル名 (string)
-		contents,    // 2nd argument: コンテンツスライス ([]*genai.Content)
-		// 3rd argument: コンフィグ (*genai.GenerateContentConfig)。今回はnilで省略可能だが、生成設定（温度、トークン制限など）が必要な場合に利用。
+		c.modelName,
+		contents,
 		nil,
 	)
 
@@ -113,7 +105,7 @@ func (c *Client) GenerateScript(ctx context.Context, inputContent []byte, mode s
 
 	// その後、コンテンツの有無をチェック
 	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
+		return "", fmt.Errorf("gemini response candidate is empty or lacks content parts")
 	}
 
 	firstPart := candidate.Content.Parts[0]
