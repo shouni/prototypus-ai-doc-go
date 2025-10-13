@@ -19,15 +19,34 @@ const (
 	MinHeadingLength     = 3
 	mainContentSelectors = "article, main, div[role='main'], #main, #content, .post-content, .article-body, .entry-content"
 	noiseSelectors       = ".related-posts, .social-share, .comments, .ad-banner, .advertisement"
-	// table を除外し、個別処理に移管
-	textExtractionTags = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre"
-	userAgent          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
+	textExtractionTags   = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre"
+	userAgent            = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
+
+	// 修正 2: 新しい定数 tableCaptionPrefix を追加
 	titlePrefix        = "【記事タイトル】 "
+	tableCaptionPrefix = "【表題】 "
 )
 
 var httpClient = &http.Client{
 	Timeout: DefaultHTTPTimeout,
 }
+
+// ----------------------------------------------------------------------
+// ヘルパー関数 (修正 1: テキスト正規化ロジックの抽出)
+// ----------------------------------------------------------------------
+
+// normalizeText は与えられた文字列の改行、タブ、連続するスペースを正規化します。
+func normalizeText(text string) string {
+	text = strings.ReplaceAll(text, "\n", " ")
+	text = strings.ReplaceAll(text, "\t", " ")
+	// Fieldsで空白文字（連続するスペース、タブなど）で分割し、Joinで単一のスペースで再結合する
+	text = strings.Join(strings.Fields(text), " ")
+	return strings.TrimSpace(text)
+}
+
+// ----------------------------------------------------------------------
+// メイン関数
+// ----------------------------------------------------------------------
 
 // FetchAndExtractText は指定されたURLからコンテンツを取得し、整形されたテキストを抽出します。
 func FetchAndExtractText(url string, ctx context.Context) (text string, hasBodyFound bool, err error) {
@@ -113,20 +132,12 @@ func findMainContent(doc *goquery.Document) *goquery.Selection {
 
 // processGeneralElement は個々のHTML要素からテキストを抽出し、整形します。
 func processGeneralElement(s *goquery.Selection) string {
-	// 1. .Text()で全テキストを取得
 	text := s.Text()
-
-	// ★ 修正 1: テキスト正規化ロジックを適用
-	// 改行、タブをスペースに変換し、連続するスペースを1つにまとめる
-	text = strings.ReplaceAll(text, "\n", " ")
-	text = strings.ReplaceAll(text, "\t", " ")
-	text = strings.Join(strings.Fields(text), " ")
-
-	// 最後にトリム
-	text = strings.TrimSpace(text)
+	// 修正 1: ヘルパー関数を使用してテキストを正規化
+	text = normalizeText(text)
 
 	isHeading := s.Is("h1, h2, h3, h4, h5, h6")
-	isListItem := s.Is("li") // ★ 修正 2: リストアイテムの判定を追加
+	isListItem := s.Is("li")
 
 	if text == "" {
 		return ""
@@ -138,7 +149,7 @@ func processGeneralElement(s *goquery.Selection) string {
 			return "## " + text
 		}
 	} else {
-		// ★ 修正 2: リストアイテムは長さフィルタを適用しない
+		// リストアイテムは長さフィルタを適用しない
 		if isListItem || len(text) > MinParagraphLength {
 			// 段落はそのまま
 			return text
@@ -151,10 +162,10 @@ func processGeneralElement(s *goquery.Selection) string {
 func processTable(s *goquery.Selection) string {
 	var tableContent []string
 
-	// ★ 改善点（オプション再掲）: テーブルキャプションを最初に抽出する
 	captionText := strings.TrimSpace(s.Find("caption").First().Text())
 	if captionText != "" {
-		tableContent = append(tableContent, "【表題】 "+captionText)
+		// 修正 2: 定数 tableCaptionPrefix を使用
+		tableContent = append(tableContent, tableCaptionPrefix+captionText)
 	}
 
 	// テーブルの各行(tr)をループ
@@ -163,20 +174,9 @@ func processTable(s *goquery.Selection) string {
 
 		// 行の中の各セル(th, td)をループ
 		row.Find("th, td").Each(func(cellIndex int, cell *goquery.Selection) {
-
-			// ★ 修正 1: セル内のテキスト抽出ロジックを強化 ★
-			// 1. .Text()で全テキストを取得
 			text := cell.Text()
-
-			// 2. 複数の改行やタブをスペース1つに置換し、テキストを正規化
-			text = strings.ReplaceAll(text, "\n", " ")
-			text = strings.ReplaceAll(text, "\t", " ")
-
-			// 3. 連続するスペースを1つにまとめる
-			text = strings.Join(strings.Fields(text), " ")
-
-			// 4. 最後にトリム
-			rowTexts = append(rowTexts, strings.TrimSpace(text))
+			// 修正 1: ヘルパー関数を使用してテキストを正規化
+			rowTexts = append(rowTexts, normalizeText(text))
 		})
 
 		// セルのテキストを "|" で結合して1行の文字列にする
