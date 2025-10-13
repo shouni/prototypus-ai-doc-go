@@ -135,7 +135,7 @@ func processSegment(ctx context.Context, client *APIClient, seg scriptSegment, s
 		return segmentResult{index: index, err: fmt.Errorf("セグメント %d のAPIリクエストが連続失敗: %w", index, currentErr)}
 	}
 
-	// ここには到達しないはずだが、念のため
+	// ここには到達しないはずだが、念のため（全てのコードパスで return が保証されているため）
 	return segmentResult{index: index, err: fmt.Errorf("セグメント %d の処理が不明な理由で失敗しました", index)}
 }
 
@@ -228,7 +228,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 		return fmt.Errorf("WAVデータの結合に失敗しました: %w", err)
 	}
 
-	slog.Info("全てのセグメントの合成と結合が完了しました。ファイル書き込みを行います。", "output_file", outputWavFile)
+	slog.InfoContext(ctx, "全てのセグメントの合成と結合が完了しました。ファイル書き込みを行います。", "output_file", outputWavFile)
 
 	return os.WriteFile(outputWavFile, combinedWavBytes, 0644)
 }

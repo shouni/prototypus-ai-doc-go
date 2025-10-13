@@ -21,7 +21,6 @@ func GetPromptByMode(mode string) (string, error) {
 		return ZundaMetanDialoguePrompt, nil
 	case "solo":
 		return ZundamonSoloPrompt, nil
-	// ★ Duet モードの処理を追加
 	case "duet":
 		return ZundaMetanDuetPrompt, nil
 	default:
