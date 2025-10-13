@@ -167,15 +167,6 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 			continue
 		}
 
-		// グローバルなコンテキストキャンセルをチェック
-		select {
-		case <-ctx.Done():
-			slog.Info("処理がキャンセルされました（グローバルコンテキスト）")
-			// 既に起動済みのGoroutineには影響しないが、新規起動を停止
-			return ctx.Err()
-		default:
-		}
-
 		semaphore <- struct{}{} // セマフォ取得 (ブロックされる可能性あり)
 		wg.Add(1)
 
@@ -183,7 +174,6 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 			defer wg.Done()
 			defer func() { <-semaphore }() // セマフォ解放
 
-			// セグメントごとのタイムアウトを持つ子コンテキストを作成
 			segCtx, cancel := context.WithTimeout(ctx, segmentTimeout)
 			defer cancel()
 
