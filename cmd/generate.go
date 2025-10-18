@@ -8,12 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	// 外部モジュールに置き換え
 	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
-
-	// 既存の internal/ パッケージを維持
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
+	promptInternal "prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
 	"prototypus-ai-doc-go/internal/web"
 )
@@ -30,9 +28,9 @@ var (
 	scriptFile     string
 
 	// AI クライアント設定フラグ
-	aiAPIKey string // NewClientFromEnv を使用するため、ここでは resolveAPIKey のみに使用
-	aiModel  string // GenerateContent の引数として使用
-	aiURL    string // NewClientFromEnv を使用するため、ここでは未使用
+	aiAPIKey string
+	aiModel  string
+	aiURL    string
 )
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
@@ -60,7 +58,6 @@ func init() {
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
 
 	// AI クライアント設定フラグ
-	// 💡 修正点: aiModel は GenerateContent に引数として渡す
 	generateCmd.Flags().StringVar(&aiAPIKey, "ai-api-key", "",
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&aiModel, "ai-model", "gemini-2.5-flash",
@@ -76,11 +73,8 @@ func readFileContent(filePath string) ([]byte, error) {
 }
 
 // resolveAPIKey は環境変数とフラグからAPIキーを決定します。
-// NewClientFromEnv は環境変数を見るため、この関数は checkAPIKey の補助として使用。
 func resolveAPIKey(flagKey string) string {
 	if flagKey != "" {
-		// フラグがある場合、環境変数に設定し直すか、直接NewClientに渡す必要があるが、
-		// NewClientFromEnv の動作を尊重し、ここではフラグの存在確認に留める。
 		return flagKey
 	}
 	return os.Getenv("GEMINI_API_KEY")
@@ -140,24 +134,29 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// --- 2. AIクライアントの初期化とスクリプト生成 ---
 
-	// APIキーが存在するかをチェック (resolveAPIKeyでフラグまたは環境変数をチェック)
 	if resolveAPIKey(aiAPIKey) == "" {
 		return errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
 	}
 
-	// フラグでキーが指定された場合、NewClientFromEnv が環境変数から読み込むことを期待しているため、
-	// ここで一時的に環境変数を上書きする処理を入れることが理想的だが、今回は一旦スキップ。
-
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, aiModel, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
+	// 💡 修正2: 元のプロジェクトのロジックを使って完全なプロンプトを作成する
+	// プロンプトテンプレート文字列を取得
+	promptTemplate, err := promptInternal.GetPromptByMode(mode)
+	if err != nil {
+		return fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
+	}
+
+	fullPrompt := fmt.Sprintf("%s\n\n--- 元文章 ---\n%s", promptTemplate, string(inputContent))
+	promptContentBytes := []byte(fullPrompt)
+
 	aiClient, err := geminiClient.NewClientFromEnv(ctx)
 	if err != nil {
-		// NewClientFromEnv は APIキーが見つからない場合もエラーを返す可能性がある
 		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
 
-	generatedResponse, err := aiClient.GenerateContent(ctx, inputContent, mode, aiModel)
+	generatedResponse, err := aiClient.GenerateContent(ctx, promptContentBytes, "", aiModel)
 	if err != nil {
 		return fmt.Errorf("スクリプト生成に失敗しました (リトライ済): %w", err)
 	}
@@ -185,6 +184,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 		fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", voicevoxOutput)
 
+		// この処理で、AIが生成したスクリプトがVOICEVOXの期待するタグ形式になっている必要があります。
 		err = voicevox.PostToEngine(ctx, generatedScript, voicevoxOutput, speakerData, voicevoxAPIURL)
 
 		if err != nil {
