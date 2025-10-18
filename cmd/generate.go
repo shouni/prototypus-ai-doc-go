@@ -65,7 +65,6 @@ func init() {
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&aiModel, "ai-model", "gemini-2.5-flash",
 		"使用するGeminiモデル名。")
-	// 🚨 修正: ライブラリでサポートされていないため、使用できないことを明記
 	generateCmd.Flags().StringVar(&aiURL, "ai-url", "",
 		"Gemini APIのベースURL。現在のライブラリでは、このフラグによるAPIエンドポイントのカスタマイズはサポートされていません。")
 }
@@ -148,7 +147,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		return errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
 	}
 
-	// 🚨 修正: NewClientFromEnvではなく、APIキーを直接Configに詰めてNewClientを呼び出す
 	clientConfig := geminiClient.Config{
 		APIKey: finalAPIKey,
 		// MaxRetries はデフォルトを使用（設定可能なフラグがないため）
