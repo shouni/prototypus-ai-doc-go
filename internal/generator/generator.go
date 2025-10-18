@@ -19,9 +19,7 @@ import (
 	"prototypus-ai-doc-go/internal/voicevox"
 )
 
-// 最小入力コンテンツ長の命名を変更
 const MinInputContentLength = 10
-const defaultVoicevoxAPIURL = "http://localhost:50021"
 
 // --------------------------------------------------------------------------------
 // 内部ヘルパー関数 (GenerateHandlerのプライベートメソッドへ移動)
@@ -58,15 +56,13 @@ type GenerateOptions struct {
 	ScriptFile     string
 	AIAPIKey       string
 	AIModel        string
-	AIURL          string // このフィールドは残すが、処理では無視される（後で削除を推奨）
 	HTTPTimeout    time.Duration
 }
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateHandler struct {
-	Options   GenerateOptions
-	Extractor *webextractor.Extractor
-	// DIの徹底: VoicevoxClientを注入
+	Options        GenerateOptions
+	Extractor      *webextractor.Extractor
 	VoicevoxClient *voicevox.Client
 }
 
@@ -198,8 +194,6 @@ func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*geminiClient
 		APIKey: finalAPIKey,
 	}
 
-	// --ai-urlに関する警告メッセージを削除
-
 	aiClient, err := geminiClient.NewClient(ctx, clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
@@ -243,8 +237,6 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 		// 通常、このパスは実行されないはず
 		return errors.New("内部エラー: VoicevoxClientが初期化されていません")
 	}
-
-	// API URL設定のログはcmd/generate.goに移動
 
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
 
