@@ -2,13 +2,15 @@ package voicevox
 
 import (
 	"bytes"
+	"log/slog" // ★ 追加: 警告ログ用
 	"regexp"
 	"strings"
 )
 
 // ----------------------------------------------------------------------
-// 演出用感情タグの定義 (変更なし)
+// 演出用感情タグの定義
 // ----------------------------------------------------------------------
+
 const emotionTagsPattern = `(解説|疑問|驚き|理解|落ち着き|納得|断定|呼びかけ|まとめ|通常|喜び|怒り|ノーマル|あまあま|ツンツン|セクシー|ヒソヒソ|ささやき)`
 
 var (
@@ -17,6 +19,9 @@ var (
 	// 最大テキスト長をバイト数で設定（VOICEVOXの限界回避のため、日本語を考慮して厳しめに設定）
 	maxSegmentByteLength = 1000
 )
+
+// scriptSegment は engine.go で定義されたものを利用します。（ここでは再定義を省略）
+// type scriptSegment struct { ... }
 
 // ----------------------------------------------------------------------
 // スクリプト解析ロジック
@@ -66,7 +71,6 @@ func parseScript(script string) []scriptSegment {
 			newCombinedTag := speakerTag + vvStyleTag
 
 			// 結合後の長さチェック
-			// 既存のテキストに新しいテキストを追加した場合の長さ
 			potentialLen := currentText.Len() + 1 + len(textPart)
 
 			if currentTag == "" {
@@ -75,6 +79,14 @@ func parseScript(script string) []scriptSegment {
 				currentText.WriteString(textPart)
 			} else if newCombinedTag != currentTag || potentialLen > maxSegmentByteLength {
 				// タグが変わった、または最大文字数を超えた場合
+
+				if potentialLen > maxSegmentByteLength {
+					slog.Warn("セグメントの最大文字数を超過しました。現在のセグメントを強制的に確定し、超過行のテキストは次のセグメントに持ち越されます。",
+						"segment_bytes", currentText.Len(),
+						"max_bytes", maxSegmentByteLength,
+						"tag", currentTag)
+				}
+
 				flushSegment() // 古いセグメントを確定
 
 				// 新しいセグメントを開始
@@ -93,17 +105,19 @@ func parseScript(script string) []scriptSegment {
 			potentialLen := currentText.Len() + 1 + len(line)
 
 			if potentialLen > maxSegmentByteLength {
-				// 結合中に最大文字数を超えた場合、一旦セグメントを確定し、
-				// 現在の行は新しいセグメントとして開始する (タグなしの行がセグメントの先頭になるのは稀だが、安全策)
-				flushSegment()
-				// NOTE: この行はタグがないため、新しいセグメントとして開始できない。ここでは単にスキップする。
+				// ★ 修正: タグのない超過テキストの破棄を防止し、警告する
+				slog.Warn("タグのないテキスト行が最大セグメント文字数を超過しました。テキストは破棄され、音声合成されません。",
+					"tag", currentTag,
+					"max_bytes", maxSegmentByteLength,
+					"text_lost", line)
+				// この行のテキストは無視し、次の行の処理へ進む
+
 			} else {
 				// タグが同じであるとみなし、テキストを結合
 				currentText.WriteString(" ")
 				currentText.WriteString(line)
 			}
 		}
-		// マッチしない（不正な形式の）行は無視される
 	}
 
 	// ループ終了後、バッファに残っている最後のセグメントを確定
