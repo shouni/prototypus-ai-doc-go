@@ -16,7 +16,6 @@ import (
 )
 
 // Client はVOICEVOXエンジンへのAPIリクエストを処理するクライアントです。
-// APIClientからClientに名称を変更しました。
 type Client struct {
 	client      *http.Client
 	apiURL      string
@@ -32,6 +31,8 @@ const (
 
 	// MaxResponseBodySize は、あらゆるHTTPレスポンスボディの最大読み込みサイズ (httpclientから流用)
 	MaxResponseBodySize = int64(10 * 1024 * 1024) // 10MB
+
+	// WavTotalHeaderSize は wav_utils.go で定義されているため、ここでは削除します。
 )
 
 // NonRetryableHTTPError はHTTP 4xx系のステータスコードエラーを示すカスタムエラー型です。(httpclientから流用)
@@ -64,7 +65,7 @@ func IsNonRetryableError(err error) bool {
 	return errors.As(err, &nonRetryable)
 }
 
-// NewClient は新しいClientインスタンスを初期化します。(NewAPIClientからNewClientに名称変更)
+// NewClient は新しいClientインスタンスを初期化します。
 func NewClient(apiURL string) *Client {
 	return &Client{
 		client: &http.Client{
@@ -109,18 +110,27 @@ func (c *Client) doWithRetry(ctx context.Context, operationName string, op func(
 }
 
 // handleResponseはHTTPレスポンスを処理し、成功した場合はボディをバイト配列として返します。
-// 5xxエラーはリトライ可能なエラーとして返し、4xxエラーはNonRetryableHTTPErrorとして返します。
 func handleResponse(resp *http.Response) ([]byte, error) {
+	// deferは最初に実行し、エラーが発生した場合でも必ずBodyを閉じるようにします。
 	defer resp.Body.Close()
 
+	// ContentLengthによる事前チェック (存在しない/不正な値の場合は次のLimitReaderで捕捉)
 	if resp.ContentLength > 0 && resp.ContentLength > MaxResponseBodySize {
-		return nil, fmt.Errorf("レスポンスボディが最大サイズ (%dバイト) を超えました", MaxResponseBodySize)
+		return nil, fmt.Errorf("レスポンスボディが最大サイズ (%dバイト) を超えました (Content-Length ヘッダーによるチェック)", MaxResponseBodySize)
 	}
 
-	limitedReader := io.LimitReader(resp.Body, MaxResponseBodySize)
+	// MaxResponseBodySize + 1 バイトを制限に設定し、制限超過を検出できるようにします。
+	limitedReader := io.LimitReader(resp.Body, MaxResponseBodySize+1)
+
 	bodyBytes, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, fmt.Errorf("レスポンスボディの読み込みに失敗しました: %w", err)
+	}
+
+	// 実際に読み込んだバイト数が MaxResponseBodySize を超えていた場合、エラーを返します。
+	if len(bodyBytes) > int(MaxResponseBodySize) {
+		// ボディは MaxResponseBodySize + 1 で切り詰められているため、正確なサイズではなく超過を通知
+		return nil, fmt.Errorf("レスポンスボディが最大サイズ (%dバイト) を超えました (読み込みサイズ: %d)", MaxResponseBodySize, MaxResponseBodySize)
 	}
 
 	// 2xx系は成功
@@ -175,7 +185,7 @@ func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([
 			return fmt.Errorf("オーディオクエリAPI呼び出し失敗: %w", err)
 		}
 
-		// httpclientから流用したhandleResponseでエラーとリトライ可否を判定
+		// handleResponseでエラーとリトライ可否を判定
 		queryBody, err = handleResponse(resp)
 		return err
 	}
@@ -207,7 +217,7 @@ func (c *Client) runSynthesis(queryBody []byte, styleID int, ctx context.Context
 		if err != nil {
 			return fmt.Errorf("音声合成POSTリクエスト作成失敗: %w", err)
 		}
-		c.addCommonHeaders(req)
+		c.addCommonHeaders(req)                            // User-Agentを追加
 		req.Header.Set("Content-Type", "application/json") // JSONボディを送信することを明示
 
 		resp, err := c.client.Do(req)
@@ -216,7 +226,7 @@ func (c *Client) runSynthesis(queryBody []byte, styleID int, ctx context.Context
 			return fmt.Errorf("音声合成API呼び出し失敗: %w", err)
 		}
 
-		// httpclientから流用したhandleResponseでエラーとリトライ可否を判定
+		// handleResponseでエラーとリトライ可否を判定
 		wavData, err = handleResponse(resp)
 		if err != nil {
 			return err
