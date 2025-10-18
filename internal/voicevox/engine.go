@@ -75,7 +75,7 @@ func determineStyleID(ctx context.Context, seg scriptSegment, speakerData *Speak
 }
 
 // processSegment は単一のセグメントに対してAPI呼び出しとリトライを実行します。
-func processSegment(ctx context.Context, client *APIClient, seg scriptSegment, speakerData *SpeakerData, index int) segmentResult {
+func processSegment(ctx context.Context, client *Client, seg scriptSegment, speakerData *SpeakerData, index int) segmentResult {
 	// 1. スタイルIDの決定
 	styleID, err := determineStyleID(ctx, seg, speakerData, index)
 	if err != nil {
@@ -146,7 +146,7 @@ func processSegment(ctx context.Context, client *APIClient, seg scriptSegment, s
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成するメイン関数です。
 // この関数は並列処理、リトライロジック、エラー集約を制御します。
 func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, apiURL string) error {
-	client := NewAPIClient(apiURL)
+	client := NewClient(apiURL)
 	segments := parseScript(scriptContent)
 
 	if len(segments) == 0 {
