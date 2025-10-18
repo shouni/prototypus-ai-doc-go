@@ -8,16 +8,18 @@ import (
 	"io"
 	"os"
 	"text/template"
+	"time"
 
+	"github.com/shouni/go-web-exact/pkg/httpclient"
 	"github.com/spf13/cobra"
+
+	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
+	webextractor "github.com/shouni/go-web-exact/pkg/web"
 
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
 	promptInternal "prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
-	"prototypus-ai-doc-go/internal/web"
-
-	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
 )
 
 const MinContentLength = 10
@@ -32,12 +34,14 @@ type GenerateOptions struct {
 	ScriptFile     string
 	AIAPIKey       string
 	AIModel        string
-	AIURL          string // ライブラリの制約により無視される
+	AIURL          string
+	HTTPTimeout    time.Duration
 }
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateHandler struct {
-	Options GenerateOptions
+	Options   GenerateOptions
+	Extractor *webextractor.Extractor
 }
 
 // グローバルなオプションインスタンス。init() と RunE の間で値を共有するために使用します。
@@ -58,7 +62,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 func init() {
 	rootCmd.AddCommand(generateCmd)
 
-	// --- フラグ定義: グローバル変数ではなく、opts 構造体のフィールドにバインドする ---
+	// --- フラグ定義 ---
 	generateCmd.Flags().StringVarP(&opts.ScriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL。")
 	generateCmd.Flags().StringVarP(&opts.ScriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
 	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "",
@@ -69,6 +73,8 @@ func init() {
 		"生成されたスクリプトを外部APIに投稿します。")
 	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "v", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", 30*time.Second,
+		"Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 
 	// AI クライアント設定フラグ
 	generateCmd.Flags().StringVar(&opts.AIAPIKey, "ai-api-key", "",
@@ -111,10 +117,11 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 
 	switch {
 	case h.Options.ScriptURL != "":
-		fmt.Printf("URLからコンテンツを取得中: %s\n", h.Options.ScriptURL)
+		fmt.Printf("URLからコンテンツを取得中: %s (タイムアウト: %s)\n", h.Options.ScriptURL, h.Options.HTTPTimeout.String())
 		var text string
 		var hasBodyFound bool
-		text, hasBodyFound, err = web.FetchAndExtractText(h.Options.ScriptURL, ctx)
+
+		text, hasBodyFound, err = h.Extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
 		if err != nil {
 			return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 		}
@@ -152,7 +159,7 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 	return inputContent, nil
 }
 
-// initializeAIClient は AI クライアントを初期化します。
+// initializeAIClient は AI クライアントを初期化します。（変更なし）
 func (h *GenerateHandler) initializeAIClient(ctx context.Context) (*geminiClient.Client, error) {
 	finalAPIKey := resolveAPIKey(h.Options.AIAPIKey)
 
@@ -175,7 +182,7 @@ func (h *GenerateHandler) initializeAIClient(ctx context.Context) (*geminiClient
 	return aiClient, nil
 }
 
-// buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
+// buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。（変更なし）
 func (h *GenerateHandler) buildFullPrompt(inputContent []byte) ([]byte, error) {
 	promptTemplateString, err := promptInternal.GetPromptByMode(h.Options.Mode)
 	if err != nil {
@@ -198,7 +205,7 @@ func (h *GenerateHandler) buildFullPrompt(inputContent []byte) ([]byte, error) {
 	return fullPrompt.Bytes(), nil
 }
 
-// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
+// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。（変更なし）
 func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
 	if h.Options.VoicevoxOutput == "" {
 		return nil
@@ -227,12 +234,12 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 	return nil
 }
 
-// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
+// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。（変更なし）
 func (h *GenerateHandler) handleFinalOutput(generatedScript string) error {
 	return ioutils.WriteOutput(h.Options.OutputFile, generatedScript)
 }
 
-// handlePostAPI は生成されたスクリプトを外部APIに投稿します。
+// handlePostAPI は生成されたスクリプトを外部APIに投稿します。（変更なし）
 func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript string) error {
 	if !h.Options.PostAPI {
 		return nil
@@ -264,13 +271,12 @@ func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript str
 	return nil
 }
 
-// --------------------------------------------------------------------------------
-// メイン実行ロジック (簡素化)
-// --------------------------------------------------------------------------------
-
 // runGenerate は generate コマンドの実行ロジックです。
 func (h *GenerateHandler) runGenerate(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	fetcher := httpclient.New(h.Options.HTTPTimeout)
+	h.Extractor = webextractor.NewExtractor(fetcher) // Extractorフィールドを設定
 
 	// 1. 入力元から文章を読み込む
 	inputContent, err := h.readInputContent(ctx)
