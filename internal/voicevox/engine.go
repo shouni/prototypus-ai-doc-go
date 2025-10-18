@@ -17,9 +17,7 @@ import (
 
 const (
 	maxParallelSegments = 15                // 同時実行セグメントの最大数
-	maxRetries          = 3                 // API呼び出しのリトライ回数
 	segmentTimeout      = 120 * time.Second // 1セグメントの処理に最大120秒を許容
-	retryDelay          = 2 * time.Second   // リトライ時の初期遅延
 )
 
 var reSpeaker = regexp.MustCompile(`^(\[.+?\])`)
@@ -43,6 +41,7 @@ type segmentResult struct {
 
 // determineStyleID はセグメントの話者タグから対応するStyle IDを検索します。
 // 見つからない場合はフォールバック処理を試みます。
+// ※ この関数は変更なし
 func determineStyleID(ctx context.Context, seg scriptSegment, speakerData *SpeakerData, index int) (int, error) {
 	// 1. 完全なタグでの検索
 	styleID, ok := speakerData.StyleIDMap[seg.SpeakerTag]
@@ -74,7 +73,7 @@ func determineStyleID(ctx context.Context, seg scriptSegment, speakerData *Speak
 	return 0, fmt.Errorf("話者・スタイルタグ %s (およびデフォルトスタイル) に対応するStyle IDが見つかりません (セグメント %d)", seg.SpeakerTag, index)
 }
 
-// processSegment は単一のセグメントに対してAPI呼び出しとリトライを実行します。
+// processSegment は単一のセグメントに対してAPI呼び出しを実行します。
 func processSegment(ctx context.Context, client *Client, seg scriptSegment, speakerData *SpeakerData, index int) segmentResult {
 	// 1. スタイルIDの決定
 	styleID, err := determineStyleID(ctx, seg, speakerData, index)
@@ -82,61 +81,25 @@ func processSegment(ctx context.Context, client *Client, seg scriptSegment, spea
 		return segmentResult{index: index, err: err}
 	}
 
-	// 2. リトライロジック
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		// リトライ前のコンテキストキャンセルをチェック
-		if ctx.Err() != nil {
-			return segmentResult{index: index, err: ctx.Err()}
-		}
+	var queryBody []byte
+	var wavData []byte
+	var currentErr error
 
-		var queryBody []byte
-		var wavData []byte
-		var currentErr error
-
-		// API呼び出し (query と synthesis) を実行
-		queryBody, currentErr = client.runAudioQuery(seg.Text, styleID, ctx)
-		if currentErr == nil {
-			wavData, currentErr = client.runSynthesis(queryBody, styleID, ctx)
-		}
-
-		// 成功した場合
-		if currentErr == nil {
-			return segmentResult{index: index, wavData: wavData}
-		}
-
-		// 失敗した場合のリトライ判定
-		if attempt < maxRetries {
-			// 指数バックオフの計算: baseDelay (2s) * 2^(attempt-1)
-			backoffDelay := retryDelay * time.Duration(1<<(attempt-1))
-
-			textSnippet := seg.Text
-			if len(textSnippet) > 20 {
-				textSnippet = textSnippet[:20] + "..."
-			}
-
-			slog.WarnContext(ctx, "APIリクエストエラー。リトライします",
-				"segment_index", index,
-				"text", textSnippet,
-				"attempt", attempt,
-				"error", currentErr,
-				"delay", backoffDelay)
-
-			// リトライ遅延中にコンテキストがキャンセルされないか監視
-			select {
-			case <-ctx.Done():
-				return segmentResult{index: index, err: ctx.Err()}
-			case <-time.After(backoffDelay):
-				// 遅延完了、次の試行へ
-			}
-			continue // 次の試行へ
-		}
-
-		// 最終試行で失敗
-		return segmentResult{index: index, err: fmt.Errorf("セグメント %d のAPIリクエストが連続失敗: %w", index, currentErr)}
+	// 2. runAudioQuery: クライアント内部でリトライが実行される
+	// processSegmentはリトライの成否を心配せず、結果だけを受け取る
+	queryBody, currentErr = client.runAudioQuery(seg.Text, styleID, ctx)
+	if currentErr != nil {
+		return segmentResult{index: index, err: fmt.Errorf("セグメント %d のオーディオクエリ失敗: %w", index, currentErr)}
 	}
 
-	// ここには到達しないはずだが、念のため（全てのコードパスで return が保証されているため）
-	return segmentResult{index: index, err: fmt.Errorf("セグメント %d の処理が不明な理由で失敗しました", index)}
+	// 3. runSynthesis: クライアント内部でリトライが実行される
+	wavData, currentErr = client.runSynthesis(queryBody, styleID, ctx)
+	if currentErr != nil {
+		return segmentResult{index: index, err: fmt.Errorf("セグメント %d の音声合成失敗: %w", index, currentErr)}
+	}
+
+	// 4. 成功
+	return segmentResult{index: index, wavData: wavData}
 }
 
 // ----------------------------------------------------------------------
@@ -144,7 +107,6 @@ func processSegment(ctx context.Context, client *Client, seg scriptSegment, spea
 // ----------------------------------------------------------------------
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成するメイン関数です。
-// この関数は並列処理、リトライロジック、エラー集約を制御します。
 func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, apiURL string) error {
 	client := NewClient(apiURL)
 	segments := parseScript(scriptContent)
@@ -174,6 +136,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 			defer wg.Done()
 			defer func() { <-semaphore }() // セマフォ解放
 
+			// セグメントごとのコンテキストタイムアウトを設定
 			segCtx, cancel := context.WithTimeout(ctx, segmentTimeout)
 			defer cancel()
 
@@ -207,6 +170,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 	}
 
 	if len(allErrors) > 0 {
+		// エラーが発生した場合、すべてのエラーを結合して返す
 		return fmt.Errorf("音声合成処理中に %d 件のエラーが発生しました:\n- %s", len(allErrors), strings.Join(allErrors, "\n- "))
 	}
 
