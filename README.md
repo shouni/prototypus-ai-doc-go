@@ -6,7 +6,7 @@
 
 ## 💡 概要 (About)— **堅牢なGo並列処理とAIを統合した次世代ドキュメント音声化パイプライン**
 
-**Prototypus AI Doc Go (PAID Go)** は、独自の **Gemini API クライアントライブラリ** ([`shouni/go-ai-client`](https://www.google.com/search?q=%5Bhttps://github.com/shouni/go-ai-client%5D\(https://github.com/shouni/go-ai-client\))) と **Go言語の強力な並列処理**を融合させた、**業界最高水準の堅牢性**を持つ高生産性 CLI ツールです。
+**Prototypus AI Doc Go (PAID Go)** は、独自の **Gemini API クライアントライブラリ** ([`shouni/go-ai-client`](https://github.com/shouni/go-ai-client)) と **Go言語の強力な並列処理**を融合させた、**業界最高水準の堅牢性**を持つ高生産性 CLI ツールです。
 
 長文の技術ドキュメントや記事を、AIが話者とスタイルを明確に指示した**対話形式やモノローグ形式のナレーションスクリプト**に変換するだけでなく、その台本をローカルの **VOICEVOXエンジンに高速接続**し、**最終的な音声ファイル (WAV)** まで自動で生成する**統合パイプライン**を提供します。
 
@@ -38,7 +38,7 @@
 
 ## 🛠️ 独自のネットワーククライアントによる堅牢化
 
-本ツールは、**Webコンテンツの取得、VOICEVOX連携、外部API投稿**を含むすべてのネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ** ([`shouni/go-web-exact`](https://www.google.com/search?q=%5Bhttps://github.com/shouni/go-web-exact%5D\(https://github.com/shouni/go-web-exact\))) を使用しています。
+本ツールは、**Webコンテンツの取得、VOICEVOX連携、外部API投稿**を含むすべてのネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ** ([`shouni/go-web-exact`](https://github.com/shouni/go-web-exact))) を使用しています。
 
 ### 1\. Webコンテンツ抽出と通信の分離
 
