@@ -1,22 +1,25 @@
 package cmd
 
 import (
-	"context"
-	"errors" // errorsパッケージを追加
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"text/template"
 
 	"github.com/spf13/cobra"
 
-	"prototypus-ai-doc-go/internal/ai"
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
+	promptInternal "prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
 	"prototypus-ai-doc-go/internal/web"
+
+	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
 )
 
-const MinContentLength = 10 // AIに渡す最低限のコンテンツ長 (バイト数)
+const MinContentLength = 10
 
 // generateCmd のフラグ変数を定義
 var (
@@ -26,6 +29,11 @@ var (
 	voicevoxOutput string
 	scriptURL      string
 	scriptFile     string
+
+	// AI クライアント設定フラグ
+	aiAPIKey string
+	aiModel  string
+	aiURL    string
 )
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
@@ -40,28 +48,25 @@ Webページやファイル、標準入力から文章を読み込むことが�
 func init() {
 	rootCmd.AddCommand(generateCmd)
 
-	// --- 入力フラグ ---
-
+	// --- フラグ定義 ---
 	generateCmd.Flags().StringVarP(&scriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL (例: https://example.com/article)。")
 	generateCmd.Flags().StringVarP(&scriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
-
-	// --- 出力/設定フラグ ---
-
-	// -o, --output-file フラグ
 	generateCmd.Flags().StringVarP(&outputFile, "output-file", "o", "",
 		"生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
-
-	// -m, --mode フラグ (デフォルト値を "solo" に戻す)
 	generateCmd.Flags().StringVarP(&mode, "mode", "m", "solo",
 		"スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
-
-	// -p, --post-api フラグ
 	generateCmd.Flags().BoolVarP(&postAPI, "post-api", "p", false,
 		"生成されたスクリプトを外部APIに投稿します。")
-
-	// -v, --voicevox フラグの定義
 	generateCmd.Flags().StringVarP(&voicevoxOutput, "voicevox", "v", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+
+	// AI クライアント設定フラグ
+	generateCmd.Flags().StringVar(&aiAPIKey, "ai-api-key", "",
+		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
+	generateCmd.Flags().StringVar(&aiModel, "ai-model", "gemini-2.5-flash",
+		"使用するGeminiモデル名。")
+	generateCmd.Flags().StringVar(&aiURL, "ai-url", "",
+		"Gemini APIのベースURL。現在のライブラリでは、このフラグによるAPIエンドポイントのカスタマイズはサポートされていません。")
 }
 
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
@@ -70,14 +75,27 @@ func readFileContent(filePath string) ([]byte, error) {
 	return os.ReadFile(filePath)
 }
 
+// resolveAPIKey は環境変数とフラグからAPIキーを決定します。
+func resolveAPIKey(flagKey string) string {
+	if flagKey != "" {
+		return flagKey
+	}
+	// 環境変数 GOOGLE_API_KEY もサポートされているため、両方チェックする
+	if os.Getenv("GEMINI_API_KEY") != "" {
+		return os.Getenv("GEMINI_API_KEY")
+	}
+	return os.Getenv("GOOGLE_API_KEY")
+}
+
 // runGenerate は generate コマンドの実行ロジックです。
 func runGenerate(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
 
 	if voicevoxOutput != "" && outputFile != "" {
-		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください。")
+		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
 	}
 
-	// --- 1. 入力元から文章を読み込む（switchステートメントで簡素化） ---
+	// --- 1. 入力元から文章を読み込む ---
 	var inputContent []byte
 	var err error
 
@@ -86,13 +104,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		fmt.Printf("URLからコンテンツを取得中: %s\n", scriptURL)
 		var text string
 		var hasBodyFound bool
-
-		text, hasBodyFound, err = web.FetchAndExtractText(scriptURL, cmd.Context())
+		text, hasBodyFound, err = web.FetchAndExtractText(scriptURL, ctx)
 		if err != nil {
 			return fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 		}
 		if !hasBodyFound {
-			// 警告ログを上位レイヤーで処理
 			fmt.Fprintf(os.Stderr, "警告: 記事本文が見つかりませんでした。タイトルのみで処理を続行します。\n")
 		}
 		inputContent = []byte(text)
@@ -102,18 +118,16 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 			fmt.Println("標準入力 (stdin) から読み込み中...")
 			inputContent, err = io.ReadAll(os.Stdin)
 		} else {
-			inputContent, err = readFileContent(scriptFile) // ヘルパー関数を呼び出す
+			inputContent, err = readFileContent(scriptFile)
 		}
 		if err != nil {
 			return fmt.Errorf("スクリプトファイル '%s' の読み込みに失敗しました: %w", scriptFile, err)
 		}
 
 	default:
-		// いずれのフラグも指定なしの場合、標準入力から読み込み
 		fmt.Println("標準入力 (stdin) から読み込み中...")
 		inputContent, err = io.ReadAll(os.Stdin)
 		if err != nil {
-			// 標準入力が閉じられたことによるEOFや、その他のI/Oエラーを区別
 			if errors.Is(err, io.EOF) && len(inputContent) == 0 {
 				return fmt.Errorf("標準入力が空です。文章を入力してください。")
 			}
@@ -121,24 +135,65 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// 入力チェックを強化
 	if len(inputContent) < MinContentLength {
 		return fmt.Errorf("入力されたコンテンツが短すぎます (最低%dバイト必要です)。", MinContentLength)
 	}
 
-	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, model, len(inputContent))
-	fmt.Println("AIによるスクリプト生成を開始します...")
+	// --- 2. AIクライアントの初期化とスクリプト生成 ---
 
-	// NewClient を使用してクライアントを初期化
-	aiClient, err := ai.NewClient(context.Background(), model)
+	finalAPIKey := resolveAPIKey(aiAPIKey)
+
+	if finalAPIKey == "" {
+		return errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
+	}
+
+	clientConfig := geminiClient.Config{
+		APIKey: finalAPIKey,
+		// MaxRetries はデフォルトを使用（設定可能なフラグがないため）
+	}
+
+	// aiURLフラグは、ライブラリの制約により無視されます。
+	if aiURL != "" {
+		fmt.Fprintf(os.Stderr, "警告: '--ai-url' フラグは現在のライブラリ構造により無視されます。\n")
+	}
+
+	aiClient, err := geminiClient.NewClient(ctx, clientConfig)
 	if err != nil {
 		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
 
-	generatedScript, err := aiClient.GenerateScript(context.Background(), inputContent, mode)
+	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, aiModel, len(inputContent))
+	fmt.Println("AIによるスクリプト生成を開始します...")
+
+	// プロンプトテンプレート文字列を取得
+	promptTemplateString, err := promptInternal.GetPromptByMode(mode)
+	if err != nil {
+		return fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
+	}
+
+	// text/template を使用して、テンプレート変数をユーザー入力で置換する
+	type InputData struct{ InputText string }
+	data := InputData{InputText: string(inputContent)}
+
+	tmpl, err := template.New("prompt").Parse(promptTemplateString)
+	if err != nil {
+		return fmt.Errorf("プロンプトテンプレートの解析エラー: %w", err)
+	}
+
+	var fullPrompt bytes.Buffer
+	if err := tmpl.Execute(&fullPrompt, data); err != nil {
+		return fmt.Errorf("プロンプトへの入力埋め込みエラー: %w", err)
+	}
+
+	promptContentBytes := fullPrompt.Bytes()
+
+	// GenerateContent を呼び出す
+	generatedResponse, err := aiClient.GenerateContent(ctx, promptContentBytes, "", aiModel)
 	if err != nil {
 		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
+
+	generatedScript := generatedResponse.Text
 
 	// 生成されたスクリプトを標準エラー出力に進捗メッセージとして表示
 	fmt.Fprintln(os.Stderr, "\n--- AI スクリプト生成結果 ---")
@@ -152,27 +207,23 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("VOICEVOX_API_URL 環境変数が設定されていません")
 		}
 
-		// VOICEVOXスタイルデータ（話者情報）をロード
 		fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-		speakerData, err := voicevox.LoadSpeakers(cmd.Context(), voicevoxAPIURL)
+		speakerData, err := voicevox.LoadSpeakers(ctx, voicevoxAPIURL)
 		if err != nil {
 			return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 		}
 		fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータのロード完了。")
-		// ---------------------------------------------
 
-		// VOICEVOX出力が指定されている場合、合成処理を実行
 		fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", voicevoxOutput)
 
-		// 修正後の呼び出し: speakerDataを引数として渡す
-		err = voicevox.PostToEngine(cmd.Context(), generatedScript, voicevoxOutput, speakerData, voicevoxAPIURL)
+		// AIが生成したスクリプトがVOICEVOXの期待するタグ形式になっている必要があります。
+		err = voicevox.PostToEngine(ctx, generatedScript, voicevoxOutput, speakerData, voicevoxAPIURL)
 
 		if err != nil {
 			return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 		}
 		fmt.Fprintln(os.Stderr, "VOICEVOXによる音声合成が完了し、ファイルに保存されました。")
 
-		// 音声ファイルが出力されたため、ここで処理を終了
 		return nil
 	}
 
@@ -188,7 +239,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 			const maxLen = 50
 			inputStr := string(inputContent)
 
-			// 入力コンテンツの冒頭を使用
 			if len(inputStr) > 0 {
 				preview := inputStr
 				if len(inputStr) > maxLen {
@@ -196,7 +246,6 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 				}
 				title = fmt.Sprintf("Generated Script (Stdin): %s", preview)
 			} else {
-				// 入力が空の場合は、モードをタイトルにする
 				title = fmt.Sprintf("Generated Script (Empty Input) - Mode: %s", mode)
 			}
 		}
