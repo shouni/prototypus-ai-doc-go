@@ -1,12 +1,12 @@
 package poster
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"time"
+
+	httpclient "github.com/shouni/go-web-exact/pkg/httpclient"
 )
 
 // PostPayload はAPIに送信するデータの構造体です。
@@ -31,31 +31,19 @@ func PostToAPI(title string, mode string, scriptContent string) error {
 		Content:   scriptContent,
 	}
 
-	payloadBytes, err := json.Marshal(payload)
+	// 独自のクライアントを初期化（タイムアウトはライブラリの既定値を使用）
+	// ポスターにはタイムアウトフラグがないため、ここでクライアントのデフォルトを使用
+	client := httpclient.New(httpclient.DefaultHTTPTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), httpclient.DefaultHTTPTimeout)
+	defer cancel()
+
+	// PostJSONAndFetchBytes を呼び出し
+	_, err := client.PostJSONAndFetchBytes(apiURL, payload, ctx)
 	if err != nil {
-		return fmt.Errorf("JSONマーシャリングに失敗しました: %w", err)
+		// PostJSONAndFetchBytesはリトライ後の最終エラーを返します。
+		return fmt.Errorf("外部APIへの投稿失敗（リトライ後）: %w", err)
 	}
 
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-	}
-
-	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(payloadBytes))
-	if err != nil {
-		return fmt.Errorf("APIリクエストの作成に失敗しました: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// client.Do() を使用してリクエストを送信
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("APIへのリクエスト失敗: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("APIがエラーを返しました: %s (Status: %d)", resp.Status, resp.StatusCode)
-	}
-
+	// PostJSONAndFetchBytes がエラーを返さなかった場合、2xxステータスで成功したと見なされます。
 	return nil
 }
