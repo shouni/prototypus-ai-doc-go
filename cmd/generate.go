@@ -73,7 +73,7 @@ func init() {
 		"生成されたスクリプトを外部APIに投稿します。")
 	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "v", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
-	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", httpclient.DefaultHTTPTimeout,
+	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", 30*time.Second,
 		"Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 
 	// AI クライアント設定フラグ
