@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -62,8 +63,9 @@ func init() {
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&aiModel, "ai-model", "gemini-2.5-flash",
 		"使用するGeminiモデル名。")
+	// 🚨 修正: --ai-url フラグの説明を更新 (指摘事項への対応)
 	generateCmd.Flags().StringVar(&aiURL, "ai-url", "",
-		"Gemini APIのベースURL。NewClientFromEnvがサポートしていれば使用されます。")
+		"Gemini APIのベースURL。現在、go-ai-client の NewClientFromEnv ではサポートされていません。")
 }
 
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
@@ -85,7 +87,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	if voicevoxOutput != "" && outputFile != "" {
-		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください。")
+		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
 	}
 
 	// --- 1. 入力元から文章を読み込む ---
@@ -141,21 +143,23 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, aiModel, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
-	// 💡 修正2: 元のプロジェクトのロジックを使って完全なプロンプトを作成する
-	// プロンプトテンプレート文字列を取得
+	// プロンプトテンプレート文字列を取得 (VOICEVOX形式を強制する指示が含まれることを期待)
 	promptTemplate, err := promptInternal.GetPromptByMode(mode)
 	if err != nil {
 		return fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
 	}
 
+	// プロンプトとユーザーの入力コンテンツを結合し、AIクライアントに渡す
 	fullPrompt := fmt.Sprintf("%s\n\n--- 元文章 ---\n%s", promptTemplate, string(inputContent))
 	promptContentBytes := []byte(fullPrompt)
 
+	// NewClientFromEnv を使用 (aiURLは利用されない)
 	aiClient, err := geminiClient.NewClientFromEnv(ctx)
 	if err != nil {
 		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
 
+	// GenerateContent には、組み立てた完全なプロンプトと、モードを空文字列("")として渡す
 	generatedResponse, err := aiClient.GenerateContent(ctx, promptContentBytes, "", aiModel)
 	if err != nil {
 		return fmt.Errorf("スクリプト生成に失敗しました (リトライ済): %w", err)
@@ -184,7 +188,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 		fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", voicevoxOutput)
 
-		// この処理で、AIが生成したスクリプトがVOICEVOXの期待するタグ形式になっている必要があります。
+		// AIが生成したスクリプトがVOICEVOXの期待するタグ形式になっている必要があります。（プロンプトで強制済み）
 		err = voicevox.PostToEngine(ctx, generatedScript, voicevoxOutput, speakerData, voicevoxAPIURL)
 
 		if err != nil {
