@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	// combineWavData, parseScriptなどの未定義関数は、他のファイルに存在することを前提とします。
 )
 
 // ----------------------------------------------------------------------
@@ -27,7 +26,7 @@ var reSpeaker = regexp.MustCompile(`^(\[.+?\])`)
 // キー: "[話者][スタイル]" (string), 値: Style ID (int)
 var styleIDCache = make(map[string]int)
 
-// ★ 修正: styleIDCacheへの並行アクセスを保護するためのMutex
+// styleIDCacheへの並行アクセスを保護するためのMutex
 var styleIDCacheMutex sync.RWMutex
 
 // スクリプト解析用
@@ -55,20 +54,20 @@ func determineStyleID(ctx context.Context, seg scriptSegment, speakerData *Speak
 	tag := seg.SpeakerTag
 
 	// 1. 内部キャッシュのチェック (読み取り操作)
-	styleIDCacheMutex.RLock() // ★ RLock
+	styleIDCacheMutex.RLock()
 	if id, ok := styleIDCache[tag]; ok {
-		styleIDCacheMutex.RUnlock() // ★ RUnlock
+		styleIDCacheMutex.RUnlock()
 		return id, nil
 	}
-	styleIDCacheMutex.RUnlock() // ★ RUnlock
+	styleIDCacheMutex.RUnlock()
 
 	// 2. 完全なタグでの検索 (キャッシュミスの場合)
 	styleID, ok := speakerData.StyleIDMap[tag]
 	if ok {
 		// キャッシュに保存 (書き込み操作)
-		styleIDCacheMutex.Lock() // ★ Lock
+		styleIDCacheMutex.Lock()
 		styleIDCache[tag] = styleID
-		styleIDCacheMutex.Unlock() // ★ Unlock
+		styleIDCacheMutex.Unlock()
 		return styleID, nil
 	}
 
@@ -91,9 +90,9 @@ func determineStyleID(ctx context.Context, seg scriptSegment, speakerData *Speak
 		styleID, _ = speakerData.StyleIDMap[fallbackKey]
 
 		// フォールバック成功の場合もキャッシュに保存 (書き込み操作)
-		styleIDCacheMutex.Lock() // ★ Lock
+		styleIDCacheMutex.Lock()
 		styleIDCache[tag] = styleID
-		styleIDCacheMutex.Unlock() // ★ Unlock
+		styleIDCacheMutex.Unlock()
 
 		return styleID, nil
 	}
@@ -134,8 +133,11 @@ func processSegment(ctx context.Context, client *Client, seg scriptSegment, spea
 // ----------------------------------------------------------------------
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成するメイン関数です。
-func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, client *Client) error {
-	segments := parseScript(scriptContent)
+// ★ 修正: fallbackTagの引数を追加
+func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, client *Client, fallbackTag string) error {
+
+	// ★ 修正: fallbackTagをparseScriptに渡す
+	segments := parseScript(scriptContent, fallbackTag)
 
 	if len(segments) == 0 {
 		return fmt.Errorf("スクリプトから有効なセグメントを抽出できませんでした。AIの出力形式が [話者タグ][スタイルタグ] テキスト の形式に沿っているか確認してください")
@@ -237,6 +239,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 		return fmt.Errorf("すべてのセグメントの合成に失敗したか、有効なセグメントがありませんでした")
 	}
 
+	// NOTE: combineWavDataはここでは定義されていない外部関数を想定
 	combinedWavBytes, err := combineWavData(finalAudioDataList)
 	if err != nil {
 		return fmt.Errorf("WAVデータの結合に失敗しました: %w", err)

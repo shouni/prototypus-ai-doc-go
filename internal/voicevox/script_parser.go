@@ -18,12 +18,8 @@ var (
 	reScriptParse  = regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 	reEmotionParse = regexp.MustCompile(`\[` + emotionTagsPattern + `\]`)
 
-	// 最大テキスト長（文字数）
+	// 最大テキスト長（文字数）。VOICEVOXが安全に処理できる最大文字数の目安として250文字に設定。
 	maxSegmentCharLength = 250
-
-	// ★ 修正: タグがない場合にフォールバックするためのハードコードされたデフォルトタグ
-	// 実際の運用では、このタグは設定ファイルや外部データから取得すべきです。
-	fallbackDefaultTag = "[四国めたん][ノーマル]"
 )
 
 // scriptSegment の定義は engine.go にあることを前提とします。
@@ -33,7 +29,8 @@ var (
 // ----------------------------------------------------------------------
 
 // parseScript はスクリプトを話者・スタイルのタグが変わるか、最大文字数に達するまで結合します。
-func parseScript(script string) []scriptSegment {
+// ★ 修正: fallbackTagを受け取る引数を追加
+func parseScript(script string, fallbackTag string) []scriptSegment {
 	lines := bytes.Split([]byte(script), []byte("\n"))
 	var segments []scriptSegment
 
@@ -43,22 +40,35 @@ func parseScript(script string) []scriptSegment {
 
 	// テキストを指定された最大文字数で安全に分割するヘルパー関数
 	safeSplit := func(text string, currentLen int) (string, string) {
-		// ... (safeSplit関数の実装は省略。文字数ベースで安全に分割するロジック)
+		// 現在のテキストの文字数 + スペース1文字 + 新しいテキスト の総文字数をチェック
 		totalChars := utf8.RuneCountInString(currentText.String()) + 1 + utf8.RuneCountInString(text)
+
 		if totalChars <= maxSegmentCharLength {
+			// 制限内なら全て追加可能
 			return text, ""
 		}
+
+		// 制限超過の場合、現在のセグメントの残り許容量を計算
 		remainingCapacity := maxSegmentCharLength - (utf8.RuneCountInString(currentText.String()) + 1)
+
 		if remainingCapacity <= 0 {
+			// 既に currentText が最大値に近い場合、新しいテキスト全体を残りに回す
 			return "", text
 		}
+
+		// 新しいテキストを指定された文字数で切り取る
 		runes := []rune(text)
+
+		// 切り取る文字数
 		charsToTake := remainingCapacity
 		if charsToTake > len(runes) {
 			charsToTake = len(runes)
 		}
+
+		// 分割
 		partToAdd := string(runes[:charsToTake])
 		remainder := string(runes[charsToTake:])
+
 		return partToAdd, remainder
 	}
 
@@ -94,10 +104,8 @@ func parseScript(script string) []scriptSegment {
 			continue
 		}
 
-		// textBufferに何か残っている場合、それを現在の行の前に結合する
 		textToProcess := line
 		if textBuffer != "" {
-			// 前の行と今回の行を結合。タグなしテキストも結合ロジックに乗せる
 			textToProcess = textBuffer + " " + line
 			textBuffer = "" // バッファをクリア
 		}
@@ -105,7 +113,7 @@ func parseScript(script string) []scriptSegment {
 		matches := reScriptParse.FindStringSubmatch(textToProcess)
 
 		if len(matches) > 3 {
-			// ★ タグ行の処理 (ロジックは前回修正版と同じで安定)
+			// ★ タグ行の処理
 			speakerTag := matches[1]
 			vvStyleTag := matches[2]
 			textPart := matches[3]
@@ -149,11 +157,11 @@ func parseScript(script string) []scriptSegment {
 			}
 
 		} else {
-			// ★ タグがない行の処理 (textToProcessには line or textBuffer + line が入っている)
+			// ★ タグがない行の処理
 
 			if currentTag != "" {
 				// 既存のセグメントに結合できる場合
-				textToAppend := textToProcess // textToProcess は今回の行か、前の超過テキスト+今回の行
+				textToAppend := textToProcess
 
 				for textToAppend != "" {
 					partToAdd, remainder := safeSplit(textToAppend, currentText.Len())
@@ -178,8 +186,7 @@ func parseScript(script string) []scriptSegment {
 				}
 
 			} else {
-				// currentTag が空 (スクリプトの先頭、またはflush直後) の状態でタグなし行が来た
-				// ★ 修正: textBufferにテキストを蓄積する (textToProcessは既に textBuffer + line の状態かもしれない)
+				// currentTag が空の状態でタグなし行が来た
 				textBuffer = textToProcess
 				slog.Warn("タグのないテキスト行が検出されました。次のタグ付きセグメントに結合されます。", "text", line)
 			}
@@ -191,10 +198,9 @@ func parseScript(script string) []scriptSegment {
 
 	// ★ 修正ロジック: スクリプトの終端に残ったテキストバッファの処理
 	if textBuffer != "" {
-		// タグなしテキストが残った場合
 
-		// 1. 既存のセグメントが存在する場合、最後のタグを流用する
 		if len(segments) > 0 {
+			// 1. 既存のセグメントが存在する場合、最後のタグを流用
 			lastTag := segments[len(segments)-1].SpeakerTag
 			slog.Warn("スクリプトの最後にタグのないテキストが残りました。最後のタグを流用して最終セグメントとして合成します。",
 				"lost_text", textBuffer,
@@ -206,11 +212,11 @@ func parseScript(script string) []scriptSegment {
 			// 2. 既存のセグメントが一つもない場合 (タグなしテキストのみのスクリプト)
 			slog.Warn("スクリプトにタグ付きセグメントがありませんでした。デフォルトタグを使用してテキスト全体を合成します。",
 				"text_content", textBuffer,
-				"default_tag", fallbackDefaultTag)
+				"default_tag", fallbackTag)
 
-			// ★ クリティカルバグ修正: デフォルトタグを使用してテキストを合成
-			if fallbackDefaultTag != "" {
-				flushSegment(fallbackDefaultTag, textBuffer)
+			// ★ 修正: 設定可能なfallbackTagを使用
+			if fallbackTag != "" {
+				flushSegment(fallbackTag, textBuffer)
 			} else {
 				// デフォルトタグもない場合はエラー
 				slog.Error("スクリプトに有効なタグがなく、フォールバックタグも設定されていません。テキストは合成されません。", "lost_text", textBuffer)
@@ -218,6 +224,5 @@ func parseScript(script string) []scriptSegment {
 		}
 	}
 
-	// PostToEngineに渡すsegmentsが空の場合、PostToEngine側でエラーを返す（最初のチェックで対応済み）
 	return segments
 }
