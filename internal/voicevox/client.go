@@ -15,27 +15,22 @@ import (
 	"github.com/shouni/go-web-exact/pkg/retry"
 )
 
-// Client はVOICEVOXエンジンへのAPIリクエストを処理するクライアントです。
-type Client struct {
-	client      *http.Client
-	apiURL      string
-	retryConfig retry.Config // リトライロジック流用
-}
+// ----------------------------------------------------------------------
+// 定数と共通エラー型
+// ----------------------------------------------------------------------
 
 const (
 	// HTTPクライアントのタイムアウトを一元管理
-	httpClientTimeout = 120 * time.Second
+	httpClientTimeout = 120 * time.Second // 120秒
 
-	// サイトからのブロックを避けるためのUser-Agent (httpclientから流用)
+	// サイトからのブロックを避けるためのUser-Agent
 	UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
 
-	// MaxResponseBodySize は、あらゆるHTTPレスポンスボディの最大読み込みサイズ (httpclientから流用)
-	MaxResponseBodySize = int64(10 * 1024 * 1024) // 10MB
-
-	// WavTotalHeaderSize は wav_utils.go で定義されているため、ここでは削除します。
+	// MaxResponseBodySize は、あらゆるHTTPレスポンスボディの最大読み込みサイズ (10MB)
+	MaxResponseBodySize = int64(10 * 1024 * 1024)
 )
 
-// NonRetryableHTTPError はHTTP 4xx系のステータスコードエラーを示すカスタムエラー型です。(httpclientから流用)
+// NonRetryableHTTPError はHTTP 4xx系のステータスコードエラーを示すカスタムエラー型です。
 type NonRetryableHTTPError struct {
 	StatusCode int
 	Body       []byte
@@ -56,7 +51,7 @@ func (e *NonRetryableHTTPError) Error() string {
 	return fmt.Sprintf("HTTPクライアントエラー (非リトライ対象): ステータスコード %d, ボディなし", e.StatusCode)
 }
 
-// IsNonRetryableError は与えられたエラーが非リトライ対象のHTTPエラーであるかを判断します。(httpclientから流用)
+// IsNonRetryableError は与えられたエラーが非リトライ対象のHTTPエラーであるかを判断します。
 func IsNonRetryableError(err error) bool {
 	if err == nil {
 		return false
@@ -65,24 +60,45 @@ func IsNonRetryableError(err error) bool {
 	return errors.As(err, &nonRetryable)
 }
 
-// NewClient は新しいClientインスタンスを初期化します。
-func NewClient(apiURL string) *Client {
-	return &Client{
-		client: &http.Client{
-			Timeout: httpClientTimeout, // 120秒に設定
+// ----------------------------------------------------------------------
+// Requester インターフェース (HTTP実行の抽象化)
+// ----------------------------------------------------------------------
+
+// Requester は、HTTPリクエストの実行とエラー処理、リトライを抽象化するインターフェースです。
+// Clientはこのインターフェースに依存することで、net/httpの詳細から分離されます。
+type Requester interface {
+	DoRequest(ctx context.Context, method, fullURL string, body io.Reader, headers map[string]string) ([]byte, error)
+	Get(url string, ctx context.Context) (*http.Response, error) // 汎用GET (リトライなし)
+}
+
+// ----------------------------------------------------------------------
+// RetryHTTPRequester (Requesterの具象実装: HTTP接続とリトライの関心)
+// ----------------------------------------------------------------------
+
+// RetryHTTPRequester はRequesterインターフェースの実装で、
+// 実際のHTTPリクエスト実行、リトライ、共通エラー処理の関心を受け持ちます。
+type RetryHTTPRequester struct {
+	httpClient  *http.Client
+	retryConfig retry.Config
+}
+
+// NewRetryHTTPRequester は新しい RetryHTTPRequester を初期化します。
+func NewRetryHTTPRequester(timeout time.Duration) *RetryHTTPRequester {
+	return &RetryHTTPRequester{
+		httpClient: &http.Client{
+			Timeout: timeout,
 		},
-		apiURL:      apiURL,
-		retryConfig: retry.DefaultConfig(), // デフォルトのリトライ設定を適用
+		retryConfig: retry.DefaultConfig(),
 	}
 }
 
 // addCommonHeaders は共通のHTTPヘッダーを設定します。
-func (c *Client) addCommonHeaders(req *http.Request) {
+func (r *RetryHTTPRequester) addCommonHeaders(req *http.Request) {
 	req.Header.Set("User-Agent", UserAgent)
 }
 
 // isHTTPRetryableError はエラーがHTTPリトライ対象かどうかを判定します。
-func (c *Client) isHTTPRetryableError(err error) bool {
+func (r *RetryHTTPRequester) isHTTPRetryableError(err error) bool {
 	if err == nil {
 		return false
 	}
@@ -99,22 +115,22 @@ func (c *Client) isHTTPRetryableError(err error) bool {
 }
 
 // doWithRetry は共通のリトライロジックを実行します。
-func (c *Client) doWithRetry(ctx context.Context, operationName string, op func() error) error {
+func (r *RetryHTTPRequester) doWithRetry(ctx context.Context, operationName string, op func() error) error {
 	return retry.Do(
 		ctx,
-		c.retryConfig,
+		r.retryConfig,
 		operationName,
 		op,
-		c.isHTTPRetryableError,
+		r.isHTTPRetryableError,
 	)
 }
 
 // handleResponseはHTTPレスポンスを処理し、成功した場合はボディをバイト配列として返します。
-func handleResponse(resp *http.Response) ([]byte, error) {
+func (r *RetryHTTPRequester) handleResponse(resp *http.Response) ([]byte, error) {
 	// deferは最初に実行し、エラーが発生した場合でも必ずBodyを閉じるようにします。
 	defer resp.Body.Close()
 
-	// ContentLengthによる事前チェック (存在しない/不正な値の場合は次のLimitReaderで捕捉)
+	// ContentLengthによる事前チェック
 	if resp.ContentLength > 0 && resp.ContentLength > MaxResponseBodySize {
 		return nil, fmt.Errorf("レスポンスボディが最大サイズ (%dバイト) を超えました (Content-Length ヘッダーによるチェック)", MaxResponseBodySize)
 	}
@@ -129,7 +145,6 @@ func handleResponse(resp *http.Response) ([]byte, error) {
 
 	// 実際に読み込んだバイト数が MaxResponseBodySize を超えていた場合、エラーを返します。
 	if len(bodyBytes) > int(MaxResponseBodySize) {
-		// ボディは MaxResponseBodySize + 1 で切り詰められているため、正確なサイズではなく超過を通知
 		return nil, fmt.Errorf("レスポンスボディが最大サイズ (%dバイト) を超えました (読み込みサイズ: %d)", MaxResponseBodySize, MaxResponseBodySize)
 	}
 
@@ -151,53 +166,94 @@ func handleResponse(resp *http.Response) ([]byte, error) {
 	}
 }
 
-// Get は汎用のGETリクエストを実行します。（リトライなし）
-func (c *Client) Get(url string, ctx context.Context) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	c.addCommonHeaders(req) // User-Agentを追加
-	// contextを付与したリクエストを実行
-	return c.client.Do(req)
-}
+// DoRequest は Requester インターフェースを実装します。リクエストの作成、リトライ、エラー判定の全てをここで実行します。
+func (r *RetryHTTPRequester) DoRequest(ctx context.Context, method, fullURL string, body io.Reader, headers map[string]string) ([]byte, error) {
+	var bodyBytes []byte
 
-// runAudioQuery は /audio_query API を呼び出し、音声合成のためのクエリJSONを返します。
-func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([]byte, error) {
-	queryURL := fmt.Sprintf("%s/audio_query", c.apiURL)
-	params := url.Values{}
-	params.Add("text", text)
-	params.Add("speaker", strconv.Itoa(styleID))
-
-	var queryBody []byte
-
-	// リトライロジックでAPI呼び出しをラップ
+	// リトライロジックをラップ
 	op := func() error {
-		req, err := http.NewRequestWithContext(ctx, "POST", queryURL+"?"+params.Encode(), nil)
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, body)
 		if err != nil {
-			return fmt.Errorf("オーディオクエリPOSTリクエスト作成失敗: %w", err)
+			return fmt.Errorf("HTTPリクエスト作成失敗: %w", err)
 		}
-		c.addCommonHeaders(req) // User-Agentを追加
 
-		resp, err := c.client.Do(req)
+		// 共通ヘッダー（User-Agent）とカスタムヘッダーを追加
+		r.addCommonHeaders(req)
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+
+		resp, err := r.httpClient.Do(req)
 		if err != nil {
 			// ネットワークエラー、Contextエラーなど
-			return fmt.Errorf("オーディオクエリAPI呼び出し失敗: %w", err)
+			return fmt.Errorf("HTTPリクエスト実行失敗: %w", err)
 		}
 
 		// handleResponseでエラーとリトライ可否を判定
-		queryBody, err = handleResponse(resp)
+		bodyBytes, err = r.handleResponse(resp)
 		return err
 	}
 
-	err := c.doWithRetry(
+	err := r.doWithRetry(
 		ctx,
-		fmt.Sprintf("オーディオクエリ(%s)の実行", text),
+		fmt.Sprintf("%s %sの実行", method, fullURL),
 		op,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	return bodyBytes, nil
+}
+
+// Get は汎用のGETリクエストを実行します。（リトライなし）
+func (r *RetryHTTPRequester) Get(url string, ctx context.Context) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	r.addCommonHeaders(req) // User-Agentを追加
+	// contextを付与したリクエストを実行
+	return r.httpClient.Do(req)
+}
+
+// ----------------------------------------------------------------------
+// Client 構造体 (VOICEVOX特有のロジックの関心)
+// ----------------------------------------------------------------------
+
+// Client はVOICEVOXエンジンへのAPIリクエストを処理するクライアントです。
+type Client struct {
+	requester Requester // Requesterインターフェースに依存
+	apiURL    string
+}
+
+// NewClient は新しいClientインスタンスを初期化します。
+// 内部で RetryHTTPRequester のインスタンスを生成し、依存性を注入します。
+func NewClient(apiURL string) *Client {
+	// リトライとHTTP実行の関心は NewRetryHTTPRequester に移譲
+	requester := NewRetryHTTPRequester(httpClientTimeout)
+
+	return &Client{
+		requester: requester,
+		apiURL:    apiURL,
+	}
+}
+
+// runAudioQuery は /audio_query API を呼び出し、音声合成のためのクエリJSONを返します。
+func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([]byte, error) {
+	// VOICEVOX特有の関心: URLとクエリパラメータの組み立て
+	queryURL := fmt.Sprintf("%s/audio_query", c.apiURL)
+	params := url.Values{}
+	params.Add("text", text)
+	params.Add("speaker", strconv.Itoa(styleID))
+
+	fullURL := queryURL + "?" + params.Encode()
+
+	// Requesterに実行を委譲。リトライ、HTTP接続の関心はRequester側。
+	queryBody, err := c.requester.DoRequest(ctx, http.MethodPost, fullURL, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("オーディオクエリ実行失敗: %w", err)
 	}
 
 	return queryBody, nil
@@ -205,50 +261,33 @@ func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([
 
 // runSynthesis は /synthesis API を呼び出し、WAV形式の音声データを返します。
 func (c *Client) runSynthesis(queryBody []byte, styleID int, ctx context.Context) ([]byte, error) {
+	// VOICEVOX特有の関心: URLとクエリパラメータの組み立て
 	synthURL := fmt.Sprintf("%s/synthesis", c.apiURL)
 	synthParams := url.Values{}
 	synthParams.Add("speaker", strconv.Itoa(styleID))
 
-	var wavData []byte
+	fullURL := synthURL + "?" + synthParams.Encode()
 
-	// リトライロジックでAPI呼び出しをラップ
-	op := func() error {
-		req, err := http.NewRequestWithContext(ctx, "POST", synthURL+"?"+synthParams.Encode(), bytes.NewReader(queryBody))
-		if err != nil {
-			return fmt.Errorf("音声合成POSTリクエスト作成失敗: %w", err)
-		}
-		c.addCommonHeaders(req)                            // User-Agentを追加
-		req.Header.Set("Content-Type", "application/json") // JSONボディを送信することを明示
-
-		resp, err := c.client.Do(req)
-		if err != nil {
-			// ネットワークエラー、Contextエラーなど
-			return fmt.Errorf("音声合成API呼び出し失敗: %w", err)
-		}
-
-		// handleResponseでエラーとリトライ可否を判定
-		wavData, err = handleResponse(resp)
-		if err != nil {
-			return err
-		}
-
-		// WAVEデータが空でないことを確認 (wav_utils.goで定義された定数を使用)
-		if len(wavData) < WavTotalHeaderSize {
-			return fmt.Errorf("音声合成APIから無効な（短すぎる）WAVデータが返されました。サイズ: %d", len(wavData))
-		}
-
-		return nil
+	headers := map[string]string{
+		"Content-Type": "application/json",
 	}
 
-	err := c.doWithRetry(
-		ctx,
-		fmt.Sprintf("音声合成(Style %d)の実行", styleID),
-		op,
-	)
-
+	// Requesterに実行を委譲。リトライ、HTTP接続の関心はRequester側。
+	wavData, err := c.requester.DoRequest(ctx, http.MethodPost, fullURL, bytes.NewReader(queryBody), headers)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("音声合成実行失敗: %w", err)
+	}
+
+	// VOICEVOX特有の関心: WAVデータ整合性チェック
+	if len(wavData) < WavTotalHeaderSize {
+		return nil, fmt.Errorf("音声合成APIから無効な（短すぎる）WAVデータが返されました。サイズ: %d", len(wavData))
 	}
 
 	return wavData, nil
+}
+
+// Get は汎用のGETリクエストを実行します。（Clientの公開メソッドとしてRequesterに委譲）
+func (c *Client) Get(url string, ctx context.Context) (*http.Response, error) {
+	// リトライなしのGETはRequesterのGetメソッドに委譲
+	return c.requester.Get(url, ctx)
 }
