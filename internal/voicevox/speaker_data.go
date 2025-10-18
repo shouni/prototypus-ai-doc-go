@@ -68,7 +68,7 @@ type VVSpeaker struct {
 
 // LoadSpeakers は /speakers エンドポイントからデータを取得し、SpeakerDataを構築します。
 func LoadSpeakers(ctx context.Context, apiURL string) (*SpeakerData, error) {
-	client := NewAPIClient(apiURL)
+	client := NewClient(apiURL)
 
 	resp, err := client.Get(fmt.Sprintf("%s/speakers", client.apiURL), ctx)
 	if err != nil {
