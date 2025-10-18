@@ -16,12 +16,11 @@ const emotionTagsPattern = `(解説|疑問|驚き|理解|落ち着き|納得|断
 var (
 	reScriptParse  = regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 	reEmotionParse = regexp.MustCompile(`\[` + emotionTagsPattern + `\]`)
-	// ★ 修正: バイト数制限であることを明確化。VOICEVOXエンジンが安全に処理できる最大文字数の目安 (約300文字の日本語) に相当するバイト数。
+	// 最大テキスト長をバイト数で設定（VOICEVOXの限界回避のため、日本語を考慮して厳しめに設定）
 	maxSegmentByteLength = 1000
 )
 
-// scriptSegment は engine.go で定義されたものを利用します。（ここでは再定義を省略）
-// type scriptSegment struct { ... }
+// scriptSegment の定義は engine.go にあることを前提とします。
 
 // ----------------------------------------------------------------------
 // スクリプト解析ロジック
@@ -34,7 +33,7 @@ func parseScript(script string) []scriptSegment {
 
 	var currentTag string
 	var currentText strings.Builder
-	var textBuffer string // ★ 追加: タグがない行の超過テキストを一時保持するバッファ
+	var textBuffer string // タグがない行の超過テキストを一時保持するバッファ
 
 	// 結合されたセグメントを確定してリセットするヘルパー関数
 	flushSegment := func() {
@@ -55,7 +54,6 @@ func parseScript(script string) []scriptSegment {
 		currentText.Reset()
 	}
 
-	// ★ 修正: 行処理ループ
 	for _, lineBytes := range lines {
 		line := string(bytes.TrimSpace(lineBytes))
 		if line == "" {
@@ -111,13 +109,12 @@ func parseScript(script string) []scriptSegment {
 			potentialLen := currentText.Len() + 1 + len(line)
 
 			if potentialLen > maxSegmentByteLength {
-				// ★ 修正: 超過テキストを破棄せず、一時バッファに保持して次のタグ行で処理する
+				// 超過したタグなしテキストの場合:
 
-				// 現在のセグメントを確定 (文字数制限内でできる限り合成)
+				// 既存のセグメントを確定（文字数制限内でできる限り合成）
 				flushSegment()
 
 				slog.Warn("タグのないテキスト行が最大セグメント文字数を超過したため、テキストを一時バッファに保持し、次のタグ付きセグメントに結合します。",
-					"tag", currentTag,
 					"max_bytes", maxSegmentByteLength,
 					"text_overflow", line)
 
@@ -135,9 +132,29 @@ func parseScript(script string) []scriptSegment {
 	// ループ終了後、バッファに残っている最後のセグメントを確定
 	flushSegment()
 
-	// 最後に textBuffer に何かが残っている場合は、タグなしテキストが無視された可能性があるため、致命的な警告
+	// ★ 修正ロジック: スクリプトの終端に残ったテキストバッファの処理
 	if textBuffer != "" {
-		slog.Error("スクリプトの最後にタグのない超過テキストが残されました。このテキストは合成されません。", "lost_text", textBuffer)
+		if len(segments) > 0 {
+			// タグ付きセグメントが存在する場合、最後のセグメントのタグを流用してテキストを合成
+			lastTag := segments[len(segments)-1].SpeakerTag
+			slog.Warn("スクリプトの最後にタグのないテキストが残りました。最後のタグを流用して最終セグメントとして合成します。",
+				"lost_text", textBuffer,
+				"used_tag", lastTag)
+
+			// 感情タグを除去し、スペースをトリム
+			finalText := reEmotionParse.ReplaceAllString(textBuffer, "")
+			finalText = strings.TrimSpace(finalText)
+
+			if finalText != "" {
+				segments = append(segments, scriptSegment{
+					SpeakerTag: lastTag, // 最後のタグを流用
+					Text:       finalText,
+				})
+			}
+		} else {
+			// スクリプト全体にタグ付きセグメントが一つもない場合、テキストロストの可能性が高いためエラーを記録
+			slog.Error("スクリプトに有効なタグ付きセグメントがない状態でタグのないテキストが残りました。テキストは合成されません。", "lost_text", textBuffer)
+		}
 	}
 
 	return segments
