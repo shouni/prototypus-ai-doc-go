@@ -90,13 +90,13 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
 	// 3. プロンプトの構築
-	promptContentBytes, err := h.BuildFullPrompt(string(inputContent))
+	promptContent, err := h.BuildFullPrompt(string(inputContent))
 	if err != nil {
 		return err
 	}
 
 	// 4. AIによるスクリプト生成
-	generatedResponse, err := aiClient.GenerateContent(ctx, promptContentBytes, h.Options.AIModel)
+	generatedResponse, err := aiClient.GenerateContent(ctx, promptContent, h.Options.AIModel)
 	if err != nil {
 		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
