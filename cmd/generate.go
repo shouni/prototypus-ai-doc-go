@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"bytes" // 💡 追加: text/templateの実行結果を保持するために必要
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"text/template" // 💡 追加: プロンプトテンプレートを処理するために必要
+	"text/template"
 
 	"github.com/spf13/cobra"
 
@@ -65,8 +65,9 @@ func init() {
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&aiModel, "ai-model", "gemini-2.5-flash",
 		"使用するGeminiモデル名。")
+	// 🚨 修正: ライブラリでサポートされていないため、使用できないことを明記
 	generateCmd.Flags().StringVar(&aiURL, "ai-url", "",
-		"Gemini APIのベースURL。現在、go-ai-client の NewClientFromEnv ではサポートされていません。")
+		"Gemini APIのベースURL。現在のライブラリでは、このフラグによるAPIエンドポイントのカスタマイズはサポートされていません。")
 }
 
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
@@ -80,7 +81,11 @@ func resolveAPIKey(flagKey string) string {
 	if flagKey != "" {
 		return flagKey
 	}
-	return os.Getenv("GEMINI_API_KEY")
+	// 環境変数 GOOGLE_API_KEY もサポートされているため、両方チェックする
+	if os.Getenv("GEMINI_API_KEY") != "" {
+		return os.Getenv("GEMINI_API_KEY")
+	}
+	return os.Getenv("GOOGLE_API_KEY")
 }
 
 // runGenerate は generate コマンドの実行ロジックです。
@@ -138,26 +143,37 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	// --- 2. AIクライアントの初期化とスクリプト生成 ---
 
 	finalAPIKey := resolveAPIKey(aiAPIKey)
+
 	if finalAPIKey == "" {
 		return errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
 	}
 
-	originalEnvKey := os.Getenv("GEMINI_API_KEY")
-	os.Setenv("GEMINI_API_KEY", finalAPIKey)
+	// 🚨 修正: NewClientFromEnvではなく、APIキーを直接Configに詰めてNewClientを呼び出す
+	clientConfig := geminiClient.Config{
+		APIKey: finalAPIKey,
+		// MaxRetries はデフォルトを使用（設定可能なフラグがないため）
+	}
 
-	// 処理終了後に環境変数を元に戻すための defer
-	defer os.Setenv("GEMINI_API_KEY", originalEnvKey)
+	// aiURLフラグは、ライブラリの制約により無視されます。
+	if aiURL != "" {
+		fmt.Fprintf(os.Stderr, "警告: '--ai-url' フラグは現在のライブラリ構造により無視されます。\n")
+	}
+
+	aiClient, err := geminiClient.NewClient(ctx, clientConfig)
+	if err != nil {
+		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
+	}
 
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, aiModel, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
-	// プロンプトテンプレート文字列を取得 (VOICEVOX形式を強制する指示が含まれることを期待)
+	// プロンプトテンプレート文字列を取得
 	promptTemplateString, err := promptInternal.GetPromptByMode(mode)
 	if err != nil {
 		return fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
 	}
 
-	// テンプレートの変数名 (.InputText) は以前のロジックに合わせる
+	// text/template を使用して、テンプレート変数をユーザー入力で置換する
 	type InputData struct{ InputText string }
 	data := InputData{InputText: string(inputContent)}
 
@@ -170,18 +186,13 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	if err := tmpl.Execute(&fullPrompt, data); err != nil {
 		return fmt.Errorf("プロンプトへの入力埋め込みエラー: %w", err)
 	}
+
 	promptContentBytes := fullPrompt.Bytes()
 
-	// NewClientFromEnv を使用 (aiURLは利用されない)
-	aiClient, err := geminiClient.NewClientFromEnv(ctx)
-	if err != nil {
-		return fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
-	}
-
-	// GenerateContent には、組み立てた完全なプロンプトと、モードを空文字列("")として渡す
+	// GenerateContent を呼び出す
 	generatedResponse, err := aiClient.GenerateContent(ctx, promptContentBytes, "", aiModel)
 	if err != nil {
-		return fmt.Errorf("スクリプト生成に失敗しました (リトライ済): %w", err)
+		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
 
 	generatedScript := generatedResponse.Text
@@ -207,7 +218,7 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 		fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", voicevoxOutput)
 
-		// AIが生成したスクリプトがVOICEVOXの期待するタグ形式になっている必要があります。（プロンプトで強制済み）
+		// AIが生成したスクリプトがVOICEVOXの期待するタグ形式になっている必要があります。
 		err = voicevox.PostToEngine(ctx, generatedScript, voicevoxOutput, speakerData, voicevoxAPIURL)
 
 		if err != nil {
