@@ -48,15 +48,16 @@ func (h *GenerateHandler) resolveAPIKey(flagKey string) string {
 
 // GenerateOptions はコマンドラインフラグを保持する構造体です。
 type GenerateOptions struct {
-	OutputFile     string
-	Mode           string
-	PostAPI        bool
-	VoicevoxOutput string
-	ScriptURL      string
-	ScriptFile     string
-	AIAPIKey       string
-	AIModel        string
-	HTTPTimeout    time.Duration
+	OutputFile          string
+	Mode                string
+	PostAPI             bool
+	VoicevoxOutput      string
+	ScriptURL           string
+	ScriptFile          string
+	AIAPIKey            string
+	AIModel             string
+	HTTPTimeout         time.Duration
+	VoicevoxFallbackTag string
 }
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
@@ -233,14 +234,11 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 	// VoicevoxClientが注入されていることを確認
 	client := h.VoicevoxClient
 	if client == nil {
-		// これはcmd/generate.goでNewClientを呼び忘れた場合のフォールバック/エラー
-		// 通常、このパスは実行されないはず
 		return errors.New("内部エラー: VoicevoxClientが初期化されていません")
 	}
 
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
 
-	// 注入されたクライアントを使用
 	speakerData, err := voicevox.LoadSpeakers(ctx, client)
 	if err != nil {
 		return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
@@ -249,8 +247,15 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 
 	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
 
-	// 注入されたクライアントを使用
-	err = voicevox.PostToEngine(ctx, generatedScript, h.Options.VoicevoxOutput, speakerData, client)
+	// ★ 修正: voicevox.PostToEngineの呼び出しに新しい引数 (fallbackTag) を追加
+	err = voicevox.PostToEngine(
+		ctx,
+		generatedScript,
+		h.Options.VoicevoxOutput,
+		speakerData,
+		client,
+		h.Options.VoicevoxFallbackTag, // ★ 追加された引数
+	)
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 	}
