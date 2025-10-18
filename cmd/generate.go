@@ -13,13 +13,13 @@ import (
 	"github.com/shouni/go-web-exact/pkg/httpclient"
 	"github.com/spf13/cobra"
 
-	"prototypus-ai-doc-go/internal/ioutils"
-	"prototypus-ai-doc-go/internal/poster"
-	"prototypus-ai-doc-go/internal/voicevox"
-
 	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
 	webextractor "github.com/shouni/go-web-exact/pkg/web"
+
+	"prototypus-ai-doc-go/internal/ioutils"
+	"prototypus-ai-doc-go/internal/poster"
 	promptInternal "prototypus-ai-doc-go/internal/prompt"
+	"prototypus-ai-doc-go/internal/voicevox"
 )
 
 const MinContentLength = 10
@@ -40,7 +40,8 @@ type GenerateOptions struct {
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateHandler struct {
-	Options GenerateOptions
+	Options   GenerateOptions
+	Extractor *webextractor.Extractor
 }
 
 // グローバルなオプションインスタンス。init() と RunE の間で値を共有するために使用します。
@@ -120,10 +121,7 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 		var text string
 		var hasBodyFound bool
 
-		fetcher := httpclient.New(h.Options.HTTPTimeout)
-		extractor := webextractor.NewExtractor(fetcher)
-
-		text, hasBodyFound, err = extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
+		text, hasBodyFound, err = h.Extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
 		if err != nil {
 			return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 		}
@@ -276,6 +274,9 @@ func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript str
 // runGenerate は generate コマンドの実行ロジックです。
 func (h *GenerateHandler) runGenerate(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	fetcher := httpclient.New(h.Options.HTTPTimeout)
+	h.Extractor = webextractor.NewExtractor(fetcher) // Extractorフィールドを設定
 
 	// 1. 入力元から文章を読み込む
 	inputContent, err := h.readInputContent(ctx)
