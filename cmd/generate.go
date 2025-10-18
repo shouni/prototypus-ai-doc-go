@@ -8,12 +8,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
 	promptInternal "prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
 	"prototypus-ai-doc-go/internal/web"
+
+	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
 )
 
 const MinContentLength = 10
@@ -62,9 +63,6 @@ func init() {
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&aiModel, "ai-model", "gemini-2.5-flash",
 		"使用するGeminiモデル名。")
-	// 🚨 修正: --ai-url フラグの説明を更新 (指摘事項への対応)
-	generateCmd.Flags().StringVar(&aiURL, "ai-url", "",
-		"Gemini APIのベースURL。現在、go-ai-client の NewClientFromEnv ではサポートされていません。")
 }
 
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
