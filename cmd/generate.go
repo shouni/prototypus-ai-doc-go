@@ -6,70 +6,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http" // 👈 追加: HTTPクライアント用
 	"os"
 	"text/template"
-	"time" // 👈 追加: タイムアウト定数用
 
-	"github.com/PuerkitoBio/goquery" // 👈 追加: goquery.NewDocumentFromReader用
+	"github.com/shouni/go-web-exact/pkg/httpclient"
 	"github.com/spf13/cobra"
 
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
-	promptInternal "prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
-	// "prototypus-ai-doc-go/internal/web" // 👈 削除: 内部webパッケージは使用しない
 
 	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
-	// 👈 追加: 外部コンテンツ抽出パッケージを直接インポート
 	webextractor "github.com/shouni/go-web-exact/pkg/web"
+	promptInternal "prototypus-ai-doc-go/internal/prompt"
 )
-
-// ----------------------------------------------------------------------
-// 【移植】外部パッケージの依存性の実装 (internal/web から移植)
-// ----------------------------------------------------------------------
-
-const (
-	DefaultHTTPTimeout = 30 * time.Second
-	userAgent          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
-)
-
-var httpClient = &http.Client{
-	Timeout: DefaultHTTPTimeout,
-}
-
-// HTTPAwareFetcher は webextractor.Fetcher インターフェースの実装です。
-type HTTPAwareFetcher struct{}
-
-// FetchDocument は goquery.Document を取得する具体的な実装です。
-func (*HTTPAwareFetcher) FetchDocument(url string, ctx context.Context) (*goquery.Document, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("リクエスト作成に失敗しました: %w", err)
-	}
-	req.Header.Set("User-Agent", userAgent)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTPリクエストに失敗しました: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTPステータスコードエラー: %d", resp.StatusCode)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("HTML解析に失敗しました: %w", err)
-	}
-
-	return doc, nil
-}
-
-// ----------------------------------------------------------------------
-// コマンドの定義 (変更なし)
-// ----------------------------------------------------------------------
 
 const MinContentLength = 10
 
@@ -166,12 +116,13 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 		var text string
 		var hasBodyFound bool
 
-		// 💡 修正: 外部パッケージのNewExtractorとFetchAndExtractTextを直接呼び出す
-		fetcher := &HTTPAwareFetcher{}
+		// httpclient.Client は webextractor.Fetcher インターフェースを満たす
+		fetcher := httpclient.New(httpclient.DefaultHTTPTimeout)
 		extractor := webextractor.NewExtractor(fetcher)
 
 		text, hasBodyFound, err = extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
 		if err != nil {
+			// エラーにはリトライロジックの結果が含まれる
 			return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 		}
 		if !hasBodyFound {
@@ -319,10 +270,6 @@ func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript str
 
 	return nil
 }
-
-// --------------------------------------------------------------------------------
-// メイン実行ロジック (変更なし)
-// --------------------------------------------------------------------------------
 
 // runGenerate は generate コマンドの実行ロジックです。
 func (h *GenerateHandler) runGenerate(cmd *cobra.Command, args []string) error {
