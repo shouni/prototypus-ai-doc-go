@@ -3,7 +3,7 @@ module prototypus-ai-doc-go
 go 1.25
 
 require (
-	github.com/shouni/go-ai-client v1.0.2
+	github.com/shouni/go-ai-client v1.0.4
 	github.com/shouni/go-web-exact v1.0.4
 	github.com/spf13/cobra v1.10.1
 )
