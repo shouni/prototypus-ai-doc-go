@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"regexp"
 	"strings"
-	"unicode/utf8" // ★ 追加: バイト数ではなく文字数での正確な分割をサポート
+	"unicode/utf8"
 )
 
 // ----------------------------------------------------------------------
@@ -17,10 +17,13 @@ const emotionTagsPattern = `(解説|疑問|驚き|理解|落ち着き|納得|断
 var (
 	reScriptParse  = regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 	reEmotionParse = regexp.MustCompile(`\[` + emotionTagsPattern + `\]`)
-	// ★ 修正: バイト数ではなく、VOICEVOXが安全に処理できる「文字数」の目安 (日本語で約250〜300文字) を設定。
-	// UTF-8ベースのGoではバイト数で管理するが、コメントで文字数の意図を明確化。
-	// VOICEVOXの公式制限は通常500文字だが、安全を見て250文字に設定。
+
+	// 最大テキスト長（文字数）
 	maxSegmentCharLength = 250
+
+	// ★ 修正: タグがない場合にフォールバックするためのハードコードされたデフォルトタグ
+	// 実際の運用では、このタグは設定ファイルや外部データから取得すべきです。
+	fallbackDefaultTag = "[四国めたん][ノーマル]"
 )
 
 // scriptSegment の定義は engine.go にあることを前提とします。
@@ -38,13 +41,33 @@ func parseScript(script string) []scriptSegment {
 	var currentText strings.Builder
 	var textBuffer string // タグがない行の超過テキストを一時保持するバッファ
 
+	// テキストを指定された最大文字数で安全に分割するヘルパー関数
+	safeSplit := func(text string, currentLen int) (string, string) {
+		// ... (safeSplit関数の実装は省略。文字数ベースで安全に分割するロジック)
+		totalChars := utf8.RuneCountInString(currentText.String()) + 1 + utf8.RuneCountInString(text)
+		if totalChars <= maxSegmentCharLength {
+			return text, ""
+		}
+		remainingCapacity := maxSegmentCharLength - (utf8.RuneCountInString(currentText.String()) + 1)
+		if remainingCapacity <= 0 {
+			return "", text
+		}
+		runes := []rune(text)
+		charsToTake := remainingCapacity
+		if charsToTake > len(runes) {
+			charsToTake = len(runes)
+		}
+		partToAdd := string(runes[:charsToTake])
+		remainder := string(runes[charsToTake:])
+		return partToAdd, remainder
+	}
+
 	// 結合されたセグメントを確定してリセットするヘルパー関数
 	flushSegment := func(tag string, text string) {
 		if text == "" || tag == "" {
 			return
 		}
 
-		// 感情タグを除去し、スペースをトリム
 		finalText := reEmotionParse.ReplaceAllString(text, "")
 		finalText = strings.TrimSpace(finalText)
 
@@ -56,43 +79,7 @@ func parseScript(script string) []scriptSegment {
 		}
 	}
 
-	// テキストを指定された最大文字数で安全に分割するヘルパー関数
-	// 戻り値: [0]セグメントに追加する部分, [1]残りの超過部分
-	safeSplit := func(text string, currentLen int) (string, string) {
-		// 現在のテキストの文字数 + スペース1文字 + 新しいテキスト の総文字数をチェック
-		totalChars := utf8.RuneCountInString(currentText.String()) + 1 + utf8.RuneCountInString(text)
-
-		if totalChars <= maxSegmentCharLength {
-			// 制限内なら全て追加可能
-			return text, ""
-		}
-
-		// 制限超過の場合、現在のセグメントの残り許容量を計算
-		// maxSegmentCharLength - (currentTextの文字数 + スペース1文字)
-		remainingCapacity := maxSegmentCharLength - (utf8.RuneCountInString(currentText.String()) + 1)
-
-		if remainingCapacity <= 0 {
-			// 既に currentText が最大値に近い場合、新しいテキスト全体を残りに回す
-			return "", text
-		}
-
-		// 新しいテキストを指定された文字数で切り取る
-		runes := []rune(text)
-
-		// 切り取る文字数
-		charsToTake := remainingCapacity
-		if charsToTake > len(runes) {
-			charsToTake = len(runes)
-		}
-
-		// 分割
-		partToAdd := string(runes[:charsToTake])
-		remainder := string(runes[charsToTake:])
-
-		return partToAdd, remainder
-	}
-
-	// 現在のセグメントを確定し、バッファをリセットする関数（カスタム版）
+	// 現在のセグメントを確定し、バッファをリセットする関数
 	flushAndReset := func(currentTag string, currentText *strings.Builder) {
 		if currentText.Len() > 0 && currentTag != "" {
 			flushSegment(currentTag, currentText.String())
@@ -110,6 +97,7 @@ func parseScript(script string) []scriptSegment {
 		// textBufferに何か残っている場合、それを現在の行の前に結合する
 		textToProcess := line
 		if textBuffer != "" {
+			// 前の行と今回の行を結合。タグなしテキストも結合ロジックに乗せる
 			textToProcess = textBuffer + " " + line
 			textBuffer = "" // バッファをクリア
 		}
@@ -117,35 +105,29 @@ func parseScript(script string) []scriptSegment {
 		matches := reScriptParse.FindStringSubmatch(textToProcess)
 
 		if len(matches) > 3 {
-			// ★ タグ行の処理
+			// ★ タグ行の処理 (ロジックは前回修正版と同じで安定)
 			speakerTag := matches[1]
 			vvStyleTag := matches[2]
-			textPart := matches[3] // タグ行のテキスト部分
+			textPart := matches[3]
 
 			newCombinedTag := speakerTag + vvStyleTag
-
-			// 処理対象テキスト: タグ行のテキスト部分
 			fullTextToAppend := textPart
 
 			// 1. タグ変更チェックと強制フラッシュ
 			if currentTag != "" && newCombinedTag != currentTag {
-				// タグが変わった場合、古いセグメントを確定
 				flushAndReset(currentTag, &currentText)
 				currentTag = ""
 			}
 
 			// 2. 文字数制限チェックとセグメント化
 			for fullTextToAppend != "" {
-				// currentTagが空の場合、新しいセグメントとして開始
 				if currentTag == "" {
 					currentTag = newCombinedTag
 				}
 
-				// 現在のテキスト許容量内で分割を試みる
 				partToAdd, remainder := safeSplit(fullTextToAppend, currentText.Len())
 
 				if partToAdd != "" {
-					// セグメントに追加
 					if currentText.Len() > 0 {
 						currentText.WriteString(" ")
 					}
@@ -153,70 +135,66 @@ func parseScript(script string) []scriptSegment {
 				}
 
 				if remainder != "" {
-					// 超過した場合、現在のセグメントを確定し、残りを次のセグメントとして処理
-					slog.Warn("セグメントの最大文字数を超過しました。現在のセグメントを強制的に確定し、残りのテキストを分割します。",
+					slog.Warn("タグ付きテキストが最大文字数を超過したため、セグメントを強制的に確定し、残りのテキストを分割します。",
 						"max_chars", maxSegmentCharLength,
 						"tag", currentTag)
 
 					flushAndReset(currentTag, &currentText)
 
-					// 残りのテキストを次のループで処理するためにセット
 					fullTextToAppend = remainder
-					currentTag = newCombinedTag // 新しいセグメントも同じタグで開始
+					currentTag = newCombinedTag
 				} else {
-					// 制限内に収まったらループを抜ける
 					fullTextToAppend = ""
 				}
 			}
 
-		} else if currentTag != "" {
-			// ★ タグがない行（前のタグを引き継いで結合）
-
-			textToAppend := line // タグなしの行全体を処理対象とする
-
-			for textToAppend != "" {
-				// 文字数制限内で分割を試みる
-				partToAdd, remainder := safeSplit(textToAppend, currentText.Len())
-
-				if partToAdd != "" {
-					// セグメントに追加
-					if currentText.Len() > 0 {
-						currentText.WriteString(" ")
-					}
-					currentText.WriteString(partToAdd)
-				}
-
-				if remainder != "" {
-					// 超過した場合、現在のセグメントを確定し、残りを次のセグメントとして処理
-					slog.Warn("タグのないテキスト行が最大文字数を超過したため、現在のセグメントを強制的に確定し、残りのテキストを分割します。",
-						"tag", currentTag,
-						"max_chars", maxSegmentCharLength)
-
-					flushAndReset(currentTag, &currentText)
-
-					// 残りのテキストを次のループで処理するためにセット
-					textToAppend = remainder
-					// currentTagは継続 (タグなし行は前のタグを引き継ぐ)
-				} else {
-					// 制限内に収まったらループを抜ける
-					textToAppend = ""
-				}
-			}
 		} else {
-			// タグがない行が来て、かつ currentTag も空（スクリプトの先頭、またはflush直後のタグなし行）
-			// このテキストは textBuffer に残しておく
-			textBuffer = textToProcess
-			slog.Warn("タグのないテキスト行が検出されました。次のタグ付きセグメントに結合されます。", "text", line)
+			// ★ タグがない行の処理 (textToProcessには line or textBuffer + line が入っている)
+
+			if currentTag != "" {
+				// 既存のセグメントに結合できる場合
+				textToAppend := textToProcess // textToProcess は今回の行か、前の超過テキスト+今回の行
+
+				for textToAppend != "" {
+					partToAdd, remainder := safeSplit(textToAppend, currentText.Len())
+
+					if partToAdd != "" {
+						if currentText.Len() > 0 {
+							currentText.WriteString(" ")
+						}
+						currentText.WriteString(partToAdd)
+					}
+
+					if remainder != "" {
+						slog.Warn("タグのないテキスト行が最大文字数を超過したため、現在のセグメントを強制的に確定し、残りのテキストを分割します。",
+							"tag", currentTag,
+							"max_chars", maxSegmentCharLength)
+
+						flushAndReset(currentTag, &currentText)
+						textToAppend = remainder
+					} else {
+						textToAppend = ""
+					}
+				}
+
+			} else {
+				// currentTag が空 (スクリプトの先頭、またはflush直後) の状態でタグなし行が来た
+				// ★ 修正: textBufferにテキストを蓄積する (textToProcessは既に textBuffer + line の状態かもしれない)
+				textBuffer = textToProcess
+				slog.Warn("タグのないテキスト行が検出されました。次のタグ付きセグメントに結合されます。", "text", line)
+			}
 		}
 	}
 
 	// ループ終了後、バッファに残っている最後のセグメントを確定
 	flushAndReset(currentTag, &currentText)
 
-	// 最後に textBuffer に何かが残っている場合、テキストロストの警告
+	// ★ 修正ロジック: スクリプトの終端に残ったテキストバッファの処理
 	if textBuffer != "" {
+		// タグなしテキストが残った場合
+
+		// 1. 既存のセグメントが存在する場合、最後のタグを流用する
 		if len(segments) > 0 {
-			// タグ付きセグメントが存在する場合、最後のセグメントのタグを流用してテキストを合成
 			lastTag := segments[len(segments)-1].SpeakerTag
 			slog.Warn("スクリプトの最後にタグのないテキストが残りました。最後のタグを流用して最終セグメントとして合成します。",
 				"lost_text", textBuffer,
@@ -225,10 +203,21 @@ func parseScript(script string) []scriptSegment {
 			flushSegment(lastTag, textBuffer)
 
 		} else {
-			// スクリプト全体にタグ付きセグメントが一つもない場合
-			slog.Error("スクリプトに有効なタグ付きセグメントがない状態でタグのないテキストが残りました。テキストは合成されません。", "lost_text", textBuffer)
+			// 2. 既存のセグメントが一つもない場合 (タグなしテキストのみのスクリプト)
+			slog.Warn("スクリプトにタグ付きセグメントがありませんでした。デフォルトタグを使用してテキスト全体を合成します。",
+				"text_content", textBuffer,
+				"default_tag", fallbackDefaultTag)
+
+			// ★ クリティカルバグ修正: デフォルトタグを使用してテキストを合成
+			if fallbackDefaultTag != "" {
+				flushSegment(fallbackDefaultTag, textBuffer)
+			} else {
+				// デフォルトタグもない場合はエラー
+				slog.Error("スクリプトに有効なタグがなく、フォールバックタグも設定されていません。テキストは合成されません。", "lost_text", textBuffer)
+			}
 		}
 	}
 
+	// PostToEngineに渡すsegmentsが空の場合、PostToEngine側でエラーを返す（最初のチェックで対応済み）
 	return segments
 }
