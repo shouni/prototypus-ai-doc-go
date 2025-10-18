@@ -19,17 +19,22 @@ import (
 	"prototypus-ai-doc-go/internal/voicevox"
 )
 
-const MinContentLength = 10
+// 最小入力コンテンツ長の命名を変更
+const MinInputContentLength = 10
 const defaultVoicevoxAPIURL = "http://localhost:50021"
 
+// --------------------------------------------------------------------------------
+// 内部ヘルパー関数 (GenerateHandlerのプライベートメソッドへ移動)
+// --------------------------------------------------------------------------------
+
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
-func readFileContent(filePath string) ([]byte, error) {
+func (h *GenerateHandler) readFileContent(filePath string) ([]byte, error) {
 	fmt.Printf("ファイルから読み込み中: %s\n", filePath)
 	return os.ReadFile(filePath)
 }
 
 // resolveAPIKey は環境変数とフラグからAPIキーを決定します。
-func resolveAPIKey(flagKey string) string {
+func (h *GenerateHandler) resolveAPIKey(flagKey string) string {
 	if flagKey != "" {
 		return flagKey
 	}
@@ -38,6 +43,10 @@ func resolveAPIKey(flagKey string) string {
 	}
 	return os.Getenv("GOOGLE_API_KEY")
 }
+
+// --------------------------------------------------------------------------------
+// 構造体定義
+// --------------------------------------------------------------------------------
 
 // GenerateOptions はコマンドラインフラグを保持する構造体です。
 type GenerateOptions struct {
@@ -49,7 +58,7 @@ type GenerateOptions struct {
 	ScriptFile     string
 	AIAPIKey       string
 	AIModel        string
-	AIURL          string
+	AIURL          string // このフィールドは残すが、処理では無視される（後で削除を推奨）
 	HTTPTimeout    time.Duration
 }
 
@@ -57,6 +66,8 @@ type GenerateOptions struct {
 type GenerateHandler struct {
 	Options   GenerateOptions
 	Extractor *webextractor.Extractor
+	// DIの徹底: VoicevoxClientを注入
+	VoicevoxClient *voicevox.Client
 }
 
 // --------------------------------------------------------------------------------
@@ -64,7 +75,6 @@ type GenerateHandler struct {
 // --------------------------------------------------------------------------------
 
 // RunGenerate は generate コマンドの実行ロジックです。
-// GenerateHandlerのメソッドとしてgeneratorパッケージ内で定義します。
 func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	// 1. 入力元から文章を読み込む
 	inputContent, err := h.ReadInputContent(ctx)
@@ -118,7 +128,7 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 }
 
 // --------------------------------------------------------------------------------
-// ヘルパー関数 (GenerateHandlerのメソッドとして移動)
+// ヘルパー関数
 // --------------------------------------------------------------------------------
 
 // ReadInputContent は入力ソースからコンテンツを読み込みます。
@@ -150,7 +160,8 @@ func (h *GenerateHandler) ReadInputContent(ctx context.Context) ([]byte, error) 
 			fmt.Println("標準入力 (stdin) から読み込み中...")
 			inputContent, err = io.ReadAll(os.Stdin)
 		} else {
-			inputContent, err = readFileContent(h.Options.ScriptFile)
+			// プライベートメソッドを呼び出す
+			inputContent, err = h.readFileContent(h.Options.ScriptFile)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("スクリプトファイル '%s' の読み込みに失敗しました: %w", h.Options.ScriptFile, err)
@@ -167,8 +178,8 @@ func (h *GenerateHandler) ReadInputContent(ctx context.Context) ([]byte, error) 
 		}
 	}
 
-	if len(inputContent) < MinContentLength {
-		return nil, fmt.Errorf("入力されたコンテンツが短すぎます (最低%dバイト必要です)。", MinContentLength)
+	if len(inputContent) < MinInputContentLength {
+		return nil, fmt.Errorf("入力されたコンテンツが短すぎます (最低%dバイト必要です)。", MinInputContentLength)
 	}
 
 	return inputContent, nil
@@ -176,7 +187,8 @@ func (h *GenerateHandler) ReadInputContent(ctx context.Context) ([]byte, error) 
 
 // InitializeAIClient は AI クライアントを初期化します。
 func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*geminiClient.Client, error) {
-	finalAPIKey := resolveAPIKey(h.Options.AIAPIKey)
+	// プライベートメソッドを呼び出す
+	finalAPIKey := h.resolveAPIKey(h.Options.AIAPIKey)
 
 	if finalAPIKey == "" {
 		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
@@ -186,9 +198,7 @@ func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*geminiClient
 		APIKey: finalAPIKey,
 	}
 
-	if h.Options.AIURL != "" {
-		fmt.Fprintf(os.Stderr, "警告: '--ai-url' フラグは現在のライブラリ構造により無視されます。\n")
-	}
+	// --ai-urlに関する警告メッセージを削除
 
 	aiClient, err := geminiClient.NewClient(ctx, clientConfig)
 	if err != nil {
@@ -226,16 +236,19 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 		return nil
 	}
 
-	voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
-	if voicevoxAPIURL == "" {
-		voicevoxAPIURL = defaultVoicevoxAPIURL
-		fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
+	// VoicevoxClientが注入されていることを確認
+	client := h.VoicevoxClient
+	if client == nil {
+		// これはcmd/generate.goでNewClientを呼び忘れた場合のフォールバック/エラー
+		// 通常、このパスは実行されないはず
+		return errors.New("内部エラー: VoicevoxClientが初期化されていません")
 	}
 
-	client := voicevox.NewClient(voicevoxAPIURL)
+	// API URL設定のログはcmd/generate.goに移動
 
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
 
+	// 注入されたクライアントを使用
 	speakerData, err := voicevox.LoadSpeakers(ctx, client)
 	if err != nil {
 		return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
@@ -244,6 +257,7 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 
 	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
 
+	// 注入されたクライアントを使用
 	err = voicevox.PostToEngine(ctx, generatedScript, h.Options.VoicevoxOutput, speakerData, client)
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)

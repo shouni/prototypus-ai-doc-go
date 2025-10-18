@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/shouni/go-web-exact/pkg/httpclient"
@@ -9,10 +11,15 @@ import (
 	webextractor "github.com/shouni/go-web-exact/pkg/web"
 
 	"prototypus-ai-doc-go/internal/generator"
+	"prototypus-ai-doc-go/internal/voicevox"
 )
 
 // グローバルなオプションインスタンス。
 var opts generator.GenerateOptions
+
+// defaultVoicevoxAPIURL は、generatorパッケージからインポートできないため、ここで再定義するか、直接使用する。
+// generatorパッケージ内にも定数として定義されているが、ここではVOICEVOX Clientの初期化にのみ必要。
+const defaultVoicevoxAPIURL = "http://localhost:50021"
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
@@ -23,17 +30,31 @@ Webページやファイル、標準入力から文章を読み込むことが�
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		// 依存関係の初期化
+		// 共通依存関係の初期化 (HTTPクライアント/Extractor)
 		fetcher := httpclient.New(opts.HTTPTimeout)
 		extractor := webextractor.NewExtractor(fetcher)
 
-		// generatorパッケージのGenerateHandlerを使用し、依存関係を注入
-		handler := generator.GenerateHandler{
-			Options:   opts,
-			Extractor: extractor,
+		// VOICEVOX Clientの初期化（DIの徹底）
+		var voicevoxClient *voicevox.Client
+		if opts.VoicevoxOutput != "" {
+			voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
+			if voicevoxAPIURL == "" {
+				voicevoxAPIURL = defaultVoicevoxAPIURL
+				fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
+			}
+
+			// NewClientの呼び出しはここで実行し、タイムアウトやその他の設定を適用（DIの準備）
+			voicevoxClient = voicevox.NewClient(voicevoxAPIURL) // タイムアウト引数がない NewClient を使用
 		}
 
-		// RunGenerate メソッドを呼び出し（メソッドがgeneratorパッケージに移動したため）
+		// generatorパッケージのGenerateHandlerを使用し、全ての依存関係を注入
+		handler := generator.GenerateHandler{
+			Options:        opts,
+			Extractor:      extractor,
+			VoicevoxClient: voicevoxClient, // 注入
+		}
+
+		// RunGenerate メソッドを呼び出し
 		return handler.RunGenerate(ctx)
 	},
 }
@@ -64,6 +85,6 @@ func init() {
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&opts.AIModel, "ai-model", "gemini-2.5-flash",
 		"使用するGeminiモデル名。")
-	generateCmd.Flags().StringVar(&opts.AIURL, "ai-url", "",
-		"Gemini APIのベースURL。現在のライブラリ構造では、このフラグによるAPIエンドポイントのカスタマイズはサポートされていません。")
+	// 指摘に基づき、機能しない --ai-url フラグを削除
+	// generateCmd.Flags().StringVar(&opts.AIURL, "ai-url", "", "Gemini APIのベースURL。")
 }
