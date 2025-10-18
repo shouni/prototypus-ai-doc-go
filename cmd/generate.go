@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bytes" // 💡 追加: text/templateの実行結果を保持するために必要
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"text/template" // 💡 追加: プロンプトテンプレートを処理するために必要
 
 	"github.com/spf13/cobra"
 
@@ -63,6 +65,8 @@ func init() {
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&aiModel, "ai-model", "gemini-2.5-flash",
 		"使用するGeminiモデル名。")
+	generateCmd.Flags().StringVar(&aiURL, "ai-url", "",
+		"Gemini APIのベースURL。現在、go-ai-client の NewClientFromEnv ではサポートされていません。")
 }
 
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
@@ -133,22 +137,40 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 
 	// --- 2. AIクライアントの初期化とスクリプト生成 ---
 
-	if resolveAPIKey(aiAPIKey) == "" {
+	finalAPIKey := resolveAPIKey(aiAPIKey)
+	if finalAPIKey == "" {
 		return errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
 	}
+
+	originalEnvKey := os.Getenv("GEMINI_API_KEY")
+	os.Setenv("GEMINI_API_KEY", finalAPIKey)
+
+	// 処理終了後に環境変数を元に戻すための defer
+	defer os.Setenv("GEMINI_API_KEY", originalEnvKey)
 
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", mode, aiModel, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
 	// プロンプトテンプレート文字列を取得 (VOICEVOX形式を強制する指示が含まれることを期待)
-	promptTemplate, err := promptInternal.GetPromptByMode(mode)
+	promptTemplateString, err := promptInternal.GetPromptByMode(mode)
 	if err != nil {
 		return fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
 	}
 
-	// プロンプトとユーザーの入力コンテンツを結合し、AIクライアントに渡す
-	fullPrompt := fmt.Sprintf("%s\n\n--- 元文章 ---\n%s", promptTemplate, string(inputContent))
-	promptContentBytes := []byte(fullPrompt)
+	// テンプレートの変数名 (.InputText) は以前のロジックに合わせる
+	type InputData struct{ InputText string }
+	data := InputData{InputText: string(inputContent)}
+
+	tmpl, err := template.New("prompt").Parse(promptTemplateString)
+	if err != nil {
+		return fmt.Errorf("プロンプトテンプレートの解析エラー: %w", err)
+	}
+
+	var fullPrompt bytes.Buffer
+	if err := tmpl.Execute(&fullPrompt, data); err != nil {
+		return fmt.Errorf("プロンプトへの入力埋め込みエラー: %w", err)
+	}
+	promptContentBytes := fullPrompt.Bytes()
 
 	// NewClientFromEnv を使用 (aiURLは利用されない)
 	aiClient, err := geminiClient.NewClientFromEnv(ctx)
