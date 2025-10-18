@@ -90,13 +90,13 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
 	// 3. プロンプトの構築
-	promptContentBytes, err := h.BuildFullPrompt(inputContent)
+	promptContentBytes, err := h.BuildFullPrompt(string(inputContent))
 	if err != nil {
 		return err
 	}
 
 	// 4. AIによるスクリプト生成
-	generatedResponse, err := aiClient.GenerateContent(ctx, promptContentBytes, "", h.Options.AIModel)
+	generatedResponse, err := aiClient.GenerateContent(ctx, promptContentBytes, h.Options.AIModel)
 	if err != nil {
 		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
@@ -203,26 +203,26 @@ func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*geminiClient
 }
 
 // BuildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
-func (h *GenerateHandler) BuildFullPrompt(inputContent []byte) ([]byte, error) {
+func (h *GenerateHandler) BuildFullPrompt(inputText string) (string, error) { // 引数をstringに変更
 	promptTemplateString, err := promptInternal.GetPromptByMode(h.Options.Mode)
 	if err != nil {
-		return nil, fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
+		return "", fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err) // 戻り値をstringに合わせる
 	}
 
 	type InputData struct{ InputText string }
-	data := InputData{InputText: string(inputContent)}
+	data := InputData{InputText: inputText} // stringのまま使用
 
 	tmpl, err := template.New("prompt").Parse(promptTemplateString)
 	if err != nil {
-		return nil, fmt.Errorf("プロンプトテンプレートの解析エラー: %w", err)
+		return "", fmt.Errorf("プロンプトテンプレートの解析エラー: %w", err)
 	}
 
 	var fullPrompt bytes.Buffer
 	if err := tmpl.Execute(&fullPrompt, data); err != nil {
-		return nil, fmt.Errorf("プロンプトへの入力埋め込みエラー: %w", err)
+		return "", fmt.Errorf("プロンプトへの入力埋め込みエラー: %w", err)
 	}
 
-	return fullPrompt.Bytes(), nil
+	return fullPrompt.String(), nil // []byteではなくstringを返す
 }
 
 // HandleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
