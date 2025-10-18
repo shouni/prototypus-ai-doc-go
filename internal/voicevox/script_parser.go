@@ -51,9 +51,14 @@ func (p *scriptParser) parse(script string) []scriptSegment {
 
 // processLine はスクリプトの1行を処理します。
 func (p *scriptParser) processLine(line string) {
-	textToProcess := line
+	trimmedLine := strings.TrimSpace(line) // L59で取得済み
+	if trimmedLine == "" {
+		return
+	}
+
+	textToProcess := trimmedLine
 	if p.textBuffer != "" {
-		textToProcess = p.textBuffer + " " + line
+		textToProcess = p.textBuffer + " " + trimmedLine
 		p.textBuffer = "" // バッファをクリア
 	}
 
