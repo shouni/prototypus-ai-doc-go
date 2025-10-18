@@ -6,19 +6,70 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http" // 👈 追加: HTTPクライアント用
 	"os"
 	"text/template"
+	"time" // 👈 追加: タイムアウト定数用
 
+	"github.com/PuerkitoBio/goquery" // 👈 追加: goquery.NewDocumentFromReader用
 	"github.com/spf13/cobra"
 
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
 	promptInternal "prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
-	"prototypus-ai-doc-go/internal/web"
+	// "prototypus-ai-doc-go/internal/web" // 👈 削除: 内部webパッケージは使用しない
 
 	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
+	// 👈 追加: 外部コンテンツ抽出パッケージを直接インポート
+	webextractor "github.com/shouni/go-web-exact/pkg/web"
 )
+
+// ----------------------------------------------------------------------
+// 【移植】外部パッケージの依存性の実装 (internal/web から移植)
+// ----------------------------------------------------------------------
+
+const (
+	DefaultHTTPTimeout = 30 * time.Second
+	userAgent          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
+)
+
+var httpClient = &http.Client{
+	Timeout: DefaultHTTPTimeout,
+}
+
+// HTTPAwareFetcher は webextractor.Fetcher インターフェースの実装です。
+type HTTPAwareFetcher struct{}
+
+// FetchDocument は goquery.Document を取得する具体的な実装です。
+func (*HTTPAwareFetcher) FetchDocument(url string, ctx context.Context) (*goquery.Document, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("リクエスト作成に失敗しました: %w", err)
+	}
+	req.Header.Set("User-Agent", userAgent)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPリクエストに失敗しました: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTPステータスコードエラー: %d", resp.StatusCode)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("HTML解析に失敗しました: %w", err)
+	}
+
+	return doc, nil
+}
+
+// ----------------------------------------------------------------------
+// コマンドの定義 (変更なし)
+// ----------------------------------------------------------------------
 
 const MinContentLength = 10
 
@@ -58,7 +109,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 func init() {
 	rootCmd.AddCommand(generateCmd)
 
-	// --- フラグ定義: グローバル変数ではなく、opts 構造体のフィールドにバインドする ---
+	// --- フラグ定義 ---
 	generateCmd.Flags().StringVarP(&opts.ScriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL。")
 	generateCmd.Flags().StringVarP(&opts.ScriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
 	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "",
@@ -114,7 +165,12 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 		fmt.Printf("URLからコンテンツを取得中: %s\n", h.Options.ScriptURL)
 		var text string
 		var hasBodyFound bool
-		text, hasBodyFound, err = web.FetchAndExtractText(h.Options.ScriptURL, ctx)
+
+		// 💡 修正: 外部パッケージのNewExtractorとFetchAndExtractTextを直接呼び出す
+		fetcher := &HTTPAwareFetcher{}
+		extractor := webextractor.NewExtractor(fetcher)
+
+		text, hasBodyFound, err = extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
 		if err != nil {
 			return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 		}
@@ -152,7 +208,7 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 	return inputContent, nil
 }
 
-// initializeAIClient は AI クライアントを初期化します。
+// initializeAIClient は AI クライアントを初期化します。（変更なし）
 func (h *GenerateHandler) initializeAIClient(ctx context.Context) (*geminiClient.Client, error) {
 	finalAPIKey := resolveAPIKey(h.Options.AIAPIKey)
 
@@ -175,7 +231,7 @@ func (h *GenerateHandler) initializeAIClient(ctx context.Context) (*geminiClient
 	return aiClient, nil
 }
 
-// buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
+// buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。（変更なし）
 func (h *GenerateHandler) buildFullPrompt(inputContent []byte) ([]byte, error) {
 	promptTemplateString, err := promptInternal.GetPromptByMode(h.Options.Mode)
 	if err != nil {
@@ -198,7 +254,7 @@ func (h *GenerateHandler) buildFullPrompt(inputContent []byte) ([]byte, error) {
 	return fullPrompt.Bytes(), nil
 }
 
-// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
+// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。（変更なし）
 func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
 	if h.Options.VoicevoxOutput == "" {
 		return nil
@@ -227,12 +283,12 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 	return nil
 }
 
-// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
+// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。（変更なし）
 func (h *GenerateHandler) handleFinalOutput(generatedScript string) error {
 	return ioutils.WriteOutput(h.Options.OutputFile, generatedScript)
 }
 
-// handlePostAPI は生成されたスクリプトを外部APIに投稿します。
+// handlePostAPI は生成されたスクリプトを外部APIに投稿します。（変更なし）
 func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript string) error {
 	if !h.Options.PostAPI {
 		return nil
@@ -265,7 +321,7 @@ func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript str
 }
 
 // --------------------------------------------------------------------------------
-// メイン実行ロジック (簡素化)
+// メイン実行ロジック (変更なし)
 // --------------------------------------------------------------------------------
 
 // runGenerate は generate コマンドの実行ロジックです。
