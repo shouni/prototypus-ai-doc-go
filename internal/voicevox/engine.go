@@ -107,8 +107,10 @@ func processSegment(ctx context.Context, client *Client, seg scriptSegment, spea
 // ----------------------------------------------------------------------
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成するメイン関数です。
-func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, apiURL string) error {
-	client := NewClient(apiURL)
+// 外部からClientインスタンスを受け取ることで、DI（依存性注入）に対応します。
+func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, client *Client) error {
+	// 以前: client := NewClient(apiURL) -> 外部から渡されるため削除
+
 	segments := parseScript(scriptContent)
 
 	if len(segments) == 0 {

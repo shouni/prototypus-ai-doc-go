@@ -24,6 +24,9 @@ import (
 
 const MinContentLength = 10
 
+// VOICEVOXエンジンのデフォルトURLを定義
+const defaultVoicevoxAPIURL = "http://localhost:50021"
+
 // GenerateOptions はコマンドラインフラグを保持する構造体です。
 type GenerateOptions struct {
 	OutputFile     string
@@ -106,7 +109,7 @@ func resolveAPIKey(flagKey string) string {
 // 責務を分割したヘルパー関数
 // --------------------------------------------------------------------------------
 
-// readInputContent は入力ソースからコンテンツを読み込みます。
+// readInputContent は入力ソースからコンテンツを読み込みます。（変更なし）
 func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) {
 	if h.Options.VoicevoxOutput != "" && h.Options.OutputFile != "" {
 		return nil, fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
@@ -205,7 +208,7 @@ func (h *GenerateHandler) buildFullPrompt(inputContent []byte) ([]byte, error) {
 	return fullPrompt.Bytes(), nil
 }
 
-// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。（変更なし）
+// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
 func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
 	if h.Options.VoicevoxOutput == "" {
 		return nil
@@ -213,11 +216,17 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 
 	voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
 	if voicevoxAPIURL == "" {
-		return fmt.Errorf("VOICEVOX_API_URL 環境変数が設定されていません")
+		voicevoxAPIURL = defaultVoicevoxAPIURL
+		fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
 	}
 
+	// 修正: voicevox.NewClient が string のみを引数に取るように修正
+	client := voicevox.NewClient(voicevoxAPIURL)
+
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-	speakerData, err := voicevox.LoadSpeakers(ctx, voicevoxAPIURL)
+
+	// LoadSpeakers のシグネチャは (*voicevox.Client) を取るように修正済み
+	speakerData, err := voicevox.LoadSpeakers(ctx, client)
 	if err != nil {
 		return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 	}
@@ -225,7 +234,8 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 
 	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
 
-	err = voicevox.PostToEngine(ctx, generatedScript, h.Options.VoicevoxOutput, speakerData, voicevoxAPIURL)
+	// PostToEngine のシグネチャは (*voicevox.Client) を取るように修正済み
+	err = voicevox.PostToEngine(ctx, generatedScript, h.Options.VoicevoxOutput, speakerData, client)
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 	}
@@ -271,7 +281,7 @@ func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript str
 	return nil
 }
 
-// runGenerate は generate コマンドの実行ロジックです。
+// runGenerate は generate コマンドの実行ロジックです。（変更なし）
 func (h *GenerateHandler) runGenerate(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
