@@ -36,8 +36,7 @@ var apiNameToToolTag = map[string]string{
 	"ずんだもん": SpeakerTagZundamon, // VOICEVOX API "ずんだもん" -> ツールタグ "[ずんだもん]"
 }
 
-// ★ 修正: VOICEVOX APIのスタイル名からツールのタグ定数へのマッピングを追加
-// これにより、VvTagAmaamaなどの定数が LoadSpeakers で利用される
+// VOICEVOX APIのスタイル名からツールのタグ定数へのマッピングを追加
 var styleApiNameToToolTag = map[string]string{
 	"ノーマル": VvTagNormal,
 	"あまあま": VvTagAmaama,
@@ -67,17 +66,21 @@ type VVSpeaker struct {
 }
 
 // LoadSpeakers は /speakers エンドポイントからデータを取得し、SpeakerDataを構築します。
-func LoadSpeakers(ctx context.Context, apiURL string) (*SpeakerData, error) {
-	client := NewClient(apiURL)
+// 責務の分離のため、APIクライアント(*Client)を引数として受け取ります。
+func LoadSpeakers(ctx context.Context, client *Client) (*SpeakerData, error) {
+	// client.apiURL は Client 構造体からアクセス可能
+	speakersURL := fmt.Sprintf("%s/speakers", client.apiURL)
 
-	resp, err := client.Get(fmt.Sprintf("%s/speakers", client.apiURL), ctx)
+	// HTTP通信は client.Get に委譲。リトライやエラー処理は client が担当。
+	resp, err := client.Get(speakersURL, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("/speakers API呼び出し失敗。VOICEVOXエンジンが起動しているか確認してください: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		errorBody, _ := io.ReadAll(resp.Body)
+		// エラーボディを最大サイズを超えないように読み込む
+		errorBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return nil, fmt.Errorf("/speakers APIがエラーを返しました: Status %d, Body: %s", resp.StatusCode, string(errorBody))
 	}
 
