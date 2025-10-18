@@ -4,7 +4,6 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/shouni/git-gemini-reviewer-go)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-
 ## 💡 概要 (About)— AI駆動のドキュメント音声化パイプライン
 
 **Prototypus AI Doc Go (PAID Go)** は、Google Gemini API を活用し、開発ドキュメントや技術記事などの長文を、対話形式またはモノローグ形式のナレーションスクリプトに変換する高生産性 CLI ツールです。
@@ -31,30 +30,26 @@ PAID Go を導入することで、大規模なドキュメントの音声コン
 | **並行処理** | **Goroutines (`sync` パッケージ)** | 複数の音声合成リクエストを**並列**で実行し、ネットワーク待ち時間や合成処理にかかる時間を短縮します。 |
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）やサブコマンド構造の構築に使用します。 |
 | **AI モデル** | **Google Gemini API** | 入力された文章を分析し、指定された形式のナレーションスクリプトを生成するために使用します。 |
-| **Web抽出** | **goquery (`net/http`)** | 指定されたURLから記事タイトルと本文を抽出し、AIへの入力として整形します。 |
 | **プロンプト管理** | **`//go:embed`** | プロンプトテンプレートをビルド時に実行ファイル内に埋め込み、管理を容易にします。 |
 | **APIクライアント** | 標準 `net/http` | Gemini API、VOICEVOX API、および外部POST APIとの通信に使用します。 |
 
 -----
 
-## 🛡️ Webコンテンツ抽出の堅牢性 (Robust Web Extraction)
+## 🛠️ 独自のネットワーククライアントによる堅牢化
 
-本ツールは、長文ドキュメントを確実に入手するため、Go言語の`goquery`ライブラリを基盤とした高度なWebコンテンツ抽出ロジックを採用しています。
+本ツールは、Webコンテンツの取得とネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ**を使用しています。
 
-### 1. インテリジェントな本文特定
+### 1\. Webコンテンツ抽出と通信の分離
+Webコンテンツの抽出（`goquery`ベースの処理）と、実際のHTTP通信処理を完全に分離し、`GenerateHandler`に依存性注入（DI）することで、コードの保守性とテスト容易性を高めています。
 
-主要なCMSやブログ構造に対応するため、複数のセレクタを組み合わせたロジックで本文エリアを特定します。
-* **セレクタ例:** `article`, `main`, `.post-content`, `.entry-content`, **`.markdown-body`** など、一般的なコンテンツブロックを網羅。
+### 2\. 堅牢な自動リトライとタイムアウト制御
+* **専用クライアント**: `github.com/shouni/go-web-exact/pkg/httpclient` を使用し、すべてのWeb取得リクエストを処理します。
+* **指数バックオフリトライ**: ネットワークエラー（接続失敗、5xx系サーバーエラーなど）が発生した場合、**指数バックオフ戦略**に基づいて自動的にリトライを実行します。これにより、大規模なドキュメント取得時の堅牢性が飛躍的に向上しています。
+* **ユーザー定義可能なタイムアウト**: `--http-timeout` フラグにより、Webリクエストの全体的なタイムアウト時間をユーザーが柔軟に設定可能です。
 
-### 2. ノイズ要素の自動除去
-
-抽出の純度を高めるため、記事本文とは無関係な要素（広告、ソーシャルシェアボタン、コメント欄など）を自動で除去します。
-
-* **除去対象例:** `.related-posts`, `.social-share`, `.ad-banner`, `footer`, `nav`など。
-
-### 3. クリーンなテキスト正規化
-
-抽出されたテキストは、改行や連続する空白文字がすべて単一のスペースに変換され（ノーマライズされ）、AIモデルへの入力として最適なクリーンな状態に整形されます。
+### 3\. 高度なWebコンテンツ特定ロジック (`go-web-exact` 内部)
+* **インテリジェントな本文特定**: 主要なCMSやブログ構造に対応するため、複数のセレクタを組み合わせたロジックで本文エリアを特定します。
+* **ノイズ要素の自動除去**: 広告、ソーシャルシェアボタン、コメント欄など、記事本文と無関係な要素を自動で除去します。
 
 ## 🛡️ VOICEVOX連携の堅牢性
 
@@ -116,7 +111,7 @@ AIモデルの出力形式がプロンプトの指示からわずかに逸脱し
 
 ```bash
 prototypus-ai-doc generate [flags]
-```
+````
 
 #### フラグ一覧
 
@@ -130,20 +125,22 @@ prototypus-ai-doc generate [flags]
 | `--mode` | `-m` | スクリプトの形式: **`solo`** (モノローグ/デフォルト), **`dialogue`** (対話), **`duet`** (交互ナレーション)。**(Default: `solo`)** |
 | `--voicevox` | `-v` | 生成されたスクリプトをVOICEVOXで合成し、指定されたファイル名 (`.wav`) で保存します。**他の出力フラグと同時に指定できません。** |
 | `--post-api` | `-p` | 生成されたスクリプトを `POST_API_URL` に投稿します。 |
+| `--http-timeout` | (なし) | **Webリクエストのタイムアウト時間を設定します (例: 15s, 1m)。(Default: ライブラリ既定値)** |
 
 -----
 
 ## 🔊 実行例
 
-### 例 1: Web記事を対話スクリプト化し、音声ファイルに出力
+### 例 1: Web記事を対話スクリプト化し、音声ファイルに出力（タイムアウト指定あり）
 
 VOICEVOXエンジンと環境変数が設定済みであることを前提とします。
 
 ```bash
-# Web上の技術記事を読み込み、対話モードでスクリプト生成、WAVファイルとして保存
+# Web上の技術記事を読み込み、対話モードでスクリプト生成、タイムアウトを20秒に設定
 ./bin/prototypus-ai-doc generate \
-    --script-url "https://zenn.dev/example/articles/go-concurrency-pattern" \
+    --script-url "[https://zenn.dev/example/articles/go-concurrency-pattern](https://zenn.dev/example/articles/go-concurrency-pattern)" \
     --mode dialogue \
+    --http-timeout 20s \
     --voicevox out_dialogue.wav
 ```
 
