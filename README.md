@@ -6,7 +6,7 @@
 
 ## 💡 概要 (About)— AI駆動のドキュメント音声化パイプライン
 
-**Prototypus AI Doc Go (PAID Go)** は、Google Gemini API を活用し、開発ドキュメントや技術記事などの長文を、対話形式またはモノローグ形式のナレーションスクリプトに変換する高生産性 CLI ツールです。
+**Prototypus AI Doc Go (PAID Go)** は、独自の **Gemini API クライアントライブラリ** ([`shouni/go-ai-client`](https://github.com/shouni/go-ai-client)) を活用し、開発ドキュメントや技術記事などの長文を、対話形式またはモノローグ形式のナレーションスクリプトに変換する高生産性 CLI ツールです。
 
 ### 🚀 開発チームの生産性を劇的に向上
 
@@ -37,13 +37,13 @@ PAID Go を導入することで、大規模なドキュメントの音声コン
 
 ## 🛠️ 独自のネットワーククライアントによる堅牢化
 
-本ツールは、Webコンテンツの取得とネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ**を使用しています。
+本ツールは、Webコンテンツの取得とネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ** ([`shouni/go-web-exact`](https://github.com/shouni/go-web-exact)) を使用しています。
 
 ### 1\. Webコンテンツ抽出と通信の分離
 Webコンテンツの抽出（`goquery`ベースの処理）と、実際のHTTP通信処理を完全に分離し、`GenerateHandler`に依存性注入（DI）することで、コードの保守性とテスト容易性を高めています。
 
 ### 2\. 堅牢な自動リトライとタイムアウト制御
-* **専用クライアント**: `github.com/shouni/go-web-exact/pkg/httpclient` を使用し、すべてのWeb取得リクエストを処理します。
+* **専用クライアント**: [`shouni/go-web-exact`](https://github.com/shouni/go-web-exact) 内の `pkg/httpclient` を使用し、すべてのWeb取得リクエストを処理します。
 * **指数バックオフリトライ**: ネットワークエラー（接続失敗、5xx系サーバーエラーなど）が発生した場合、**指数バックオフ戦略**に基づいて自動的にリトライを実行します。これにより、大規模なドキュメント取得時の堅牢性が飛躍的に向上しています。
 * **ユーザー定義可能なタイムアウト**: `--http-timeout` フラグにより、Webリクエストの全体的なタイムアウト時間をユーザーが柔軟に設定可能です。
 
@@ -125,7 +125,7 @@ prototypus-ai-doc generate [flags]
 | `--mode` | `-m` | スクリプトの形式: **`solo`** (モノローグ/デフォルト), **`dialogue`** (対話), **`duet`** (交互ナレーション)。**(Default: `solo`)** |
 | `--voicevox` | `-v` | 生成されたスクリプトをVOICEVOXで合成し、指定されたファイル名 (`.wav`) で保存します。**他の出力フラグと同時に指定できません。** |
 | `--post-api` | `-p` | 生成されたスクリプトを `POST_API_URL` に投稿します。 |
-| `--http-timeout` | (なし) | **Webリクエストのタイムアウト時間を設定します (例: 15s, 1m)。(Default: ライブラリ既定値)** |
+| **`--http-timeout`** | (なし) | **Webリクエストのタイムアウト時間**を設定します (例: `15s`, `1m`)。**(Default: ライブラリ既定値)** |
 
 -----
 
@@ -169,3 +169,4 @@ cat my_draft.txt | ./bin/prototypus-ai-doc generate \
 ### 📜 ライセンス (License)
 
 このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
+
