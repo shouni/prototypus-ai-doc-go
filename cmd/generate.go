@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"text/template"
+	"time"
 
 	"github.com/shouni/go-web-exact/pkg/httpclient"
 	"github.com/spf13/cobra"
@@ -33,7 +34,8 @@ type GenerateOptions struct {
 	ScriptFile     string
 	AIAPIKey       string
 	AIModel        string
-	AIURL          string // ライブラリの制約により無視される
+	AIURL          string
+	HTTPTimeout    time.Duration
 }
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
@@ -70,6 +72,8 @@ func init() {
 		"生成されたスクリプトを外部APIに投稿します。")
 	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "v", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", httpclient.DefaultHTTPTimeout,
+		"Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 
 	// AI クライアント設定フラグ
 	generateCmd.Flags().StringVar(&opts.AIAPIKey, "ai-api-key", "",
@@ -112,17 +116,15 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 
 	switch {
 	case h.Options.ScriptURL != "":
-		fmt.Printf("URLからコンテンツを取得中: %s\n", h.Options.ScriptURL)
+		fmt.Printf("URLからコンテンツを取得中: %s (タイムアウト: %s)\n", h.Options.ScriptURL, h.Options.HTTPTimeout.String())
 		var text string
 		var hasBodyFound bool
 
-		// httpclient.Client は webextractor.Fetcher インターフェースを満たす
-		fetcher := httpclient.New(httpclient.DefaultHTTPTimeout)
+		fetcher := httpclient.New(h.Options.HTTPTimeout)
 		extractor := webextractor.NewExtractor(fetcher)
 
 		text, hasBodyFound, err = extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
 		if err != nil {
-			// エラーにはリトライロジックの結果が含まれる
 			return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 		}
 		if !hasBodyFound {
