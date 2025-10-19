@@ -13,7 +13,7 @@ var (
 	reScriptParse  = regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 	reEmotionParse = regexp.MustCompile(`\[` + emotionTagsPattern + `\]`)
 	// 最大テキスト長（文字数）。VOICEVOXが安全に処理できる最大文字数の目安として250文字に設定。
-	maxSegmentCharLength = 250
+	maxSegmentCharLength = 200
 )
 
 // scriptParser はスクリプトの解析状態を管理し、セグメント化を実行します。
@@ -50,15 +50,16 @@ func (p *scriptParser) parse(script string) []scriptSegment {
 }
 
 // processLine はスクリプトの1行を処理します。
+// line は parse() で既に TrimSpace されています。
 func (p *scriptParser) processLine(line string) {
-	trimmedLine := strings.TrimSpace(line) // L59で取得済み
-	if trimmedLine == "" {
+	// 修正1: 冗長な TrimSpace を削除し、lineをそのまま使用
+	if line == "" {
 		return
 	}
 
-	textToProcess := trimmedLine
+	textToProcess := line
 	if p.textBuffer != "" {
-		textToProcess = p.textBuffer + " " + trimmedLine
+		textToProcess = p.textBuffer + " " + line
 		p.textBuffer = "" // バッファをクリア
 	}
 
@@ -101,7 +102,8 @@ func (p *scriptParser) processUntaggedLine(text string) {
 func (p *scriptParser) appendAndSplitText(text string) {
 	textToAppend := text
 	for textToAppend != "" {
-		partToAdd, remainder := p.splitTextForSegment(textToAppend)
+		// 修正2: 句読点優先の分割ロジックを使用
+		partToAdd, remainder := p.splitTextByPunctuation(textToAppend)
 
 		if partToAdd != "" {
 			if p.currentText.Len() > 0 {
@@ -121,31 +123,71 @@ func (p *scriptParser) appendAndSplitText(text string) {
 	}
 }
 
-// splitTextForSegment は、現在のセグメントの文字数制限に基づき、追記するテキストを分割します。
-func (p *scriptParser) splitTextForSegment(text string) (partToAdd string, remainder string) {
+// splitTextByPunctuation は、現在のセグメントの文字数制限と句読点に基づき、追記するテキストを分割します。
+// 句読点（。、！？）を見つけ、その直後で分割することを優先します。
+func (p *scriptParser) splitTextByPunctuation(text string) (partToAdd string, remainder string) {
 	currentRuneCount := utf8.RuneCountInString(p.currentText.String())
+
+	// 現在のセグメントが空でなければスペース1つ分加算
 	space := 0
 	if currentRuneCount > 0 {
 		space = 1
 	}
 
-	// 現在のテキスト長 + スペース + 追加テキスト長 が最大長以下ならそのまま返す
+	// 1. テキスト全体を追加しても最大長を超えない場合
 	if currentRuneCount+space+utf8.RuneCountInString(text) <= maxSegmentCharLength {
 		return text, ""
 	}
 
-	// 追加可能な残り文字数
-	remainingCapacity := maxSegmentCharLength - (currentRuneCount + space)
-	if remainingCapacity <= 0 {
+	// 2. 最大長を超過するため、分割位置を探す
+
+	// 追加可能な最大文字数（スペース分を考慮）
+	maxCapacity := maxSegmentCharLength - currentRuneCount - space
+
+	// もし現在のセグメントが既に容量オーバーなら、partToAddは空で、text全体をremainderとして返し、
+	// 呼び出し元で flushCurrentSegment() を促す。
+	if maxCapacity <= 0 {
 		return "", text
 	}
 
 	runes := []rune(text)
-	if remainingCapacity >= len(runes) {
-		return text, ""
+
+	// 許容量内で句読点を優先する分割位置を探す
+	bestSplitIndex := -1
+	// i+1 が現在のセグメントに追加されるルーン数
+	for i := 0; i < len(runes); i++ {
+		// 現在のセグメント長 + スペース + (i+1)文字が maxSegmentCharLength を超える場合、
+		// i-1までが許容量内のギリギリの分割点となる
+		if currentRuneCount+space+(i+1) > maxSegmentCharLength {
+			break // 許容量を超えたのでループを抜ける
+		}
+
+		// 許容量内の位置で、句読点の直後を分割点として記録
+		r := runes[i]
+		if r == '。' || r == '、' || r == '！' || r == '？' {
+			bestSplitIndex = i + 1 // 句読点を含めた直後で分割
+		}
 	}
 
-	return string(runes[:remainingCapacity]), string(runes[remainingCapacity:])
+	// 3. 分割の決定
+
+	if bestSplitIndex > 0 {
+		// 句読点が見つかった場合、その位置で分割
+		partToAdd = string(runes[:bestSplitIndex])
+		remainder = string(runes[bestSplitIndex:])
+		return partToAdd, remainder
+	}
+
+	// 句読点が見つからなかった、かつ最大長を超える場合 (強制分割)
+	if maxCapacity > 0 && maxCapacity < len(runes) {
+		// 許容量内で強制的に分割
+		partToAdd = string(runes[:maxCapacity])
+		remainder = string(runes[maxCapacity:])
+		return partToAdd, remainder
+	}
+
+	// ここに来ることは稀だが、text自体が短い場合のフォールバック
+	return text, ""
 }
 
 // flushCurrentSegment は現在のテキストバッファを新しいセグメントとして確定し、バッファをリセットします。
