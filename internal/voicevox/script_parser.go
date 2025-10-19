@@ -13,7 +13,7 @@ var (
 	reScriptParse  = regexp.MustCompile(`^(\[.+?\])\s*(\[.+?\])\s*(.*)`)
 	reEmotionParse = regexp.MustCompile(`\[` + emotionTagsPattern + `\]`)
 	// 最大テキスト長（文字数）。VOICEVOXが安全に処理できる最大文字数の目安として250文字に設定。
-	maxSegmentCharLength = 200
+	maxSegmentCharLength = 250
 )
 
 // scriptParser はスクリプトの解析状態を管理し、セグメント化を実行します。
