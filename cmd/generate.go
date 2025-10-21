@@ -51,7 +51,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 		handler := generator.GenerateHandler{
 			Options:        opts,
 			Extractor:      extractor,
-			VoicevoxClient: voicevoxClient, // 注入
+			VoicevoxClient: voicevoxClient,
 		}
 
 		// RunGenerate メソッドを呼び出し
@@ -71,7 +71,7 @@ func init() {
 	generateCmd.Flags().StringVarP(&opts.ScriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
 	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "",
 		"生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
-	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "solo",
+	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "duet",
 		"スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
 	generateCmd.Flags().BoolVarP(&opts.PostAPI, "post-api", "p", false,
 		"生成されたスクリプトを外部APIに投稿します。")
@@ -85,6 +85,4 @@ func init() {
 		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
 	generateCmd.Flags().StringVar(&opts.AIModel, "ai-model", "gemini-2.5-flash",
 		"使用するGeminiモデル名。")
-	// 指摘に基づき、機能しない --ai-url フラグを削除
-	// generateCmd.Flags().StringVar(&opts.AIURL, "ai-url", "", "Gemini APIのベースURL。")
 }
