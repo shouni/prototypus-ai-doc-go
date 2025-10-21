@@ -24,6 +24,6 @@ func GetPromptByMode(mode string) (string, error) {
 	case "dialogue":
 		return ZundaMetanDialoguePrompt, nil
 	default:
-		return "", fmt.Errorf("サポートされていないモード: %s. 'duet', 'solo', 'dialogue'のいずれかを指定してください", mode)
+		return "", fmt.Errorf("サポートされていないモード: %s. 'duet', 'solo', 'dialogue' のいずれかを指定してください", mode)
 	}
 }
