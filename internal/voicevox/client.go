@@ -75,7 +75,7 @@ func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([
 		return nil, fmt.Errorf("オーディオクエリ実行成功 (2xx) ですが、不正な JSON が返されました: %s", string(queryBody))
 	}
 
-	// 💡 最終修正のコア: VOICEVOXクエリに必須のキー 'accent_phrases' の存在をチェック
+	// VOICEVOXクエリに必須のキー 'accent_phrases' の存在をチェック
 	if _, ok := jsonCheck["accent_phrases"]; !ok {
 		// このエラーは、不正なクエリボディによる 422 エラーが /synthesis で発生する代わりに、ここで捕捉されます。
 		return nil, fmt.Errorf("オーディオクエリが必須フィールド 'accent_phrases' を含みません。VOICEVOXエンジンがテキストを処理できなかった可能性があります。Body: %s", string(queryBody))
