@@ -16,7 +16,7 @@ import (
 // ----------------------------------------------------------------------
 
 const (
-	maxParallelSegments = 8
+	maxParallelSegments = 6
 	segmentTimeout      = 300 * time.Second
 )
 
