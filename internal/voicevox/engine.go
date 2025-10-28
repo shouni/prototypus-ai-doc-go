@@ -16,8 +16,8 @@ import (
 // ----------------------------------------------------------------------
 
 const (
-	maxParallelSegments = 6                 // 同時実行セグメントの最大数
-	segmentTimeout      = 300 * time.Second // 1セグメントの処理に最大120秒を許容
+	maxParallelSegments = 8
+	segmentTimeout      = 300 * time.Second
 )
 
 var reSpeaker = regexp.MustCompile(`^(\[.+?\])`)
