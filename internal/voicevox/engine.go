@@ -16,8 +16,8 @@ import (
 // ----------------------------------------------------------------------
 
 const (
-	maxParallelSegments = 15                // 同時実行セグメントの最大数
-	segmentTimeout      = 120 * time.Second // 1セグメントの処理に最大120秒を許容
+	maxParallelSegments = 6
+	segmentTimeout      = 300 * time.Second
 )
 
 var reSpeaker = regexp.MustCompile(`^(\[.+?\])`)
@@ -118,6 +118,11 @@ func processSegment(ctx context.Context, client *Client, seg scriptSegment, spea
 		return segmentResult{index: index, err: fmt.Errorf("セグメント %d のオーディオクエリ失敗: %w", index, currentErr)}
 	}
 
+	if len(queryBody) == 0 {
+		// /audio_query が成功しても、テキスト処理の問題で空のボディが返る可能性を考慮
+		return segmentResult{index: index, err: fmt.Errorf("セグメント %d のオーディオクエリ結果が空です。入力テキストやAPI応答を確認してください", index)}
+	}
+
 	// 3. runSynthesis: クライアント内部でリトライが実行される
 	wavData, currentErr = client.runSynthesis(queryBody, styleID, ctx)
 	if currentErr != nil {
@@ -133,7 +138,7 @@ func processSegment(ctx context.Context, client *Client, seg scriptSegment, spea
 // ----------------------------------------------------------------------
 
 // PostToEngine はスクリプト全体をVOICEVOXエンジンに投稿し、音声ファイルを生成するメイン関数です。
-// ★ 修正: fallbackTagの引数を追加
+// NOTE: parseScript, combineWavData, SpeakerData, Client型は外部ファイルで定義されていると仮定。
 func PostToEngine(ctx context.Context, scriptContent string, outputWavFile string, speakerData *SpeakerData, client *Client, fallbackTag string) error {
 
 	// ★ 修正: fallbackTagをparseScriptに渡す

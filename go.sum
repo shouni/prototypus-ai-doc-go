@@ -42,8 +42,8 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/shouni/go-ai-client v1.0.6 h1:KvlMWfqNNia6NxkuDkML0dKz2uoUHYKtRvj3OdYXXx4=
 github.com/shouni/go-ai-client v1.0.6/go.mod h1:TAQXiekTkNMkIwtXv5SMMjaAsV7gTn/BihcLoVfO9ec=
-github.com/shouni/go-web-exact v1.0.6 h1:q/0LwBmIXlpAihk3EvMmLcg526eGkGKAKdkY2mtMqFE=
-github.com/shouni/go-web-exact v1.0.6/go.mod h1:+gHThz8aKXMKeyNu+guULZ3T+SQX7sFr4B2Iu+tpwSQ=
+github.com/shouni/go-web-exact v1.0.8 h1:xstiKFFVujPzqIuvR+d4qAKAi5wgHN0+5VBiL/1vh5k=
+github.com/shouni/go-web-exact v1.0.8/go.mod h1:+gHThz8aKXMKeyNu+guULZ3T+SQX7sFr4B2Iu+tpwSQ=
 github.com/spf13/cobra v1.10.1 h1:lJeBwCfmrnXthfAupyUTzJ/J4Nc1RsHC/mSRU2dll/s=
 github.com/spf13/cobra v1.10.1/go.mod h1:7SmJGaTHFVBY0jW4NXGluQoLvhqFQM+6XSKD+P4XaB0=
 github.com/spf13/pflag v1.0.9 h1:9exaQaMOCwffKiiiYk6/BndUBv+iRViNW+4lEMi0PvY=
