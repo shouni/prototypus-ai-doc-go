@@ -39,7 +39,7 @@
 
 ## 🛠️ 独自のネットワーククライアントによる堅牢化
 
-本ツールは、**Webコンテンツの取得、VOICEVOX連携、外部API投稿**を含むすべてのネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ** ([`shouni/go-web-exact`](https://github.com/shouni/go-web-exact))) を使用しています。
+本ツールは、**Webコンテンツの取得、VOICEVOX連携、外部API投稿**を含むすべてのネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ** ([`shouni/go-web-exact`](https://github.com/shouni/go-web-exact)) を使用しています。
 
 ### 1\. Webコンテンツ抽出と通信の分離
 
@@ -146,7 +146,7 @@ VOICEVOXエンジンと環境変数が設定済みであることを前提とし
 ```bash
 # Web上の技術記事を読み込み、対話モードでスクリプト生成、VOICEVOXの処理時間を考慮しタイムアウトを延長
 ./bin/prototypus-ai-doc generate \
-    --script-url "[https://zenn.dev/example/articles/go-concurrency-pattern](https://zenn.dev/example/articles/go-concurrency-pattern)" \
+    --script-url "https://github.com/shouni/prototypus-ai-doc-go" \
     --mode dialogue \
     --http-timeout 280s \
     --voicevox out_dialogue.wav
