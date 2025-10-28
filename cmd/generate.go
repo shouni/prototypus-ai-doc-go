@@ -42,9 +42,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 				voicevoxAPIURL = defaultVoicevoxAPIURL
 				fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
 			}
-
-			// NewClientの呼び出しはここで実行し、タイムアウトやその他の設定を適用（DIの準備）
-			voicevoxClient = voicevox.NewClient(voicevoxAPIURL) // タイムアウト引数がない NewClient を使用
+			voicevoxClient = voicevox.NewClient(voicevoxAPIURL, fetcher)
 		}
 
 		// generatorパッケージのGenerateHandlerを使用し、全ての依存関係を注入
@@ -68,7 +66,7 @@ func init() {
 
 	// --- フラグ定義 ---
 	generateCmd.Flags().StringVarP(&opts.ScriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL。")
-	generateCmd.Flags().StringVarP(&opts.ScriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます)。")
+	generateCmd.Flags().StringVarP(&opts.ScriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます。)")
 	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "",
 		"生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
 	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "duet",
