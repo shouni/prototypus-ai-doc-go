@@ -10,13 +10,13 @@ import (
 	"text/template"
 	"time"
 
-	geminiClient "github.com/shouni/go-ai-client/pkg/ai/gemini"
-	webextractor "github.com/shouni/go-web-exact/pkg/web"
-
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
-	promptInternal "prototypus-ai-doc-go/internal/prompt"
+	"prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
+
+	"github.com/shouni/go-ai-client/pkg/ai/gemini"
+	"github.com/shouni/go-web-exact/pkg/web"
 )
 
 const MinInputContentLength = 10
@@ -63,7 +63,7 @@ type GenerateOptions struct {
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateHandler struct {
 	Options        GenerateOptions
-	Extractor      *webextractor.Extractor
+	Extractor      *web.Extractor
 	VoicevoxClient *voicevox.Client
 }
 
@@ -183,7 +183,7 @@ func (h *GenerateHandler) ReadInputContent(ctx context.Context) ([]byte, error) 
 }
 
 // InitializeAIClient は AI クライアントを初期化します。
-func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*geminiClient.Client, error) {
+func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	// プライベートメソッドを呼び出す
 	finalAPIKey := h.resolveAPIKey(h.Options.AIAPIKey)
 
@@ -191,11 +191,11 @@ func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*geminiClient
 		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
 	}
 
-	clientConfig := geminiClient.Config{
+	clientConfig := gemini.Config{
 		APIKey: finalAPIKey,
 	}
 
-	aiClient, err := geminiClient.NewClient(ctx, clientConfig)
+	aiClient, err := gemini.NewClient(ctx, clientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
 	}
@@ -204,7 +204,7 @@ func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*geminiClient
 
 // BuildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
 func (h *GenerateHandler) BuildFullPrompt(inputText string) (string, error) { // 引数をstringに変更
-	promptTemplateString, err := promptInternal.GetPromptByMode(h.Options.Mode)
+	promptTemplateString, err := prompt.GetPromptByMode(h.Options.Mode)
 	if err != nil {
 		return "", fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err) // 戻り値をstringに合わせる
 	}

@@ -40,8 +40,8 @@ github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLf
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
-github.com/shouni/go-ai-client v1.0.6 h1:KvlMWfqNNia6NxkuDkML0dKz2uoUHYKtRvj3OdYXXx4=
-github.com/shouni/go-ai-client v1.0.6/go.mod h1:TAQXiekTkNMkIwtXv5SMMjaAsV7gTn/BihcLoVfO9ec=
+github.com/shouni/go-ai-client v1.0.7 h1:C91PzFfWxHzwsZHPWnaEs+AbFFR4lFkzRzBXk8jhqXc=
+github.com/shouni/go-ai-client v1.0.7/go.mod h1:TAQXiekTkNMkIwtXv5SMMjaAsV7gTn/BihcLoVfO9ec=
 github.com/shouni/go-web-exact v1.0.8 h1:xstiKFFVujPzqIuvR+d4qAKAi5wgHN0+5VBiL/1vh5k=
 github.com/shouni/go-web-exact v1.0.8/go.mod h1:+gHThz8aKXMKeyNu+guULZ3T+SQX7sFr4B2Iu+tpwSQ=
 github.com/spf13/cobra v1.10.1 h1:lJeBwCfmrnXthfAupyUTzJ/J4Nc1RsHC/mSRU2dll/s=
