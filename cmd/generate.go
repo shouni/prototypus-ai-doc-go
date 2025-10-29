@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/shouni/go-web-exact/pkg/httpclient"
+	"github.com/shouni/go-web-exact/pkg/web"
 	"github.com/spf13/cobra"
-
-	webextractor "github.com/shouni/go-web-exact/pkg/web"
-
 	"prototypus-ai-doc-go/internal/generator"
 	"prototypus-ai-doc-go/internal/voicevox"
 )
@@ -32,7 +30,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 
 		// 共通依存関係の初期化 (HTTPクライアント/Extractor)
 		fetcher := httpclient.New(opts.HTTPTimeout)
-		extractor := webextractor.NewExtractor(fetcher)
+		extractor := web.NewExtractor(fetcher)
 
 		// VOICEVOX Clientの初期化（DIの徹底）
 		var voicevoxClient *voicevox.Client
