@@ -111,10 +111,11 @@ func (c *Client) runSynthesis(queryBody []byte, styleID int, ctx context.Context
 // webclient.Client の FetchBytes は []byte を返すため、ここでは Get メソッドを削除するか、
 // FetchBytes のラッパーとして再定義し、戻り値を []byte に変更します。
 // Get(*http.Response, error) を返すのは、client.Do() のシグネチャであり、client.FetchBytes の意図に反します。
-func (c *Client) Get(url string, ctx context.Context) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (c *Client) Get(url string, ctx context.Context) ([]byte, error) {
+	// webClient.FetchBytes は内部でリクエスト作成、実行、レスポンス処理、ボディクローズを行います。
+	data, err := c.webClient.FetchBytes(url, ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GETリクエスト実行失敗: %w", err)
 	}
-	return c.webClient.Do(req)
+	return data, nil
 }
