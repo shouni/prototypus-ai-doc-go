@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strconv"
 
-	// webclient.Client 構造体を利用するためにインポート
 	webexact "github.com/shouni/go-web-exact/v2/pkg/client"
 )
 
@@ -16,17 +15,14 @@ import (
 // webclient.Client (リトライ機能付きHTTPクライアント) に依存します。
 type Client struct {
 	// webclient.Client は FetchBytes や PostJSONAndFetchBytes を持つ構造体
-	webClient webexact.Client
+	webClient *webexact.Client
 	apiURL    string
 }
 
 // NewClient は新しいClientインスタンスを初期化します。
 func NewClient(apiURL string, webClient *webexact.Client) *Client {
-	// 引数の型を *webclient.Client に修正すると DI の意図がより明確になりますが、
-	// 既存の cmd コードと整合性を保つため、今回は型を webclient.Client のままにしておきます。
-	// (webclient.Client はポインタではなく構造体として渡されていました)
 	return &Client{
-		webClient: *webClient, // ポインタではなく構造体として受け取ることを前提
+		webClient: webClient,
 		apiURL:    apiURL,
 	}
 }
@@ -36,9 +32,6 @@ func NewClient(apiURL string, webClient *webexact.Client) *Client {
 // ----------------------------------------------------------------------
 
 // runAudioQuery は /audio_query API を呼び出し、音声合成のためのクエリJSONを返します。
-// GETではなく、リクエストは空ボディのPOSTですが、POSTリクエストの実行には webClient.Do() の利用を避けます。
-// 代わりに、専用の PostJSONAndFetchBytes のようなメソッドを持つべきですが、
-// /audio_query が空ボディPOST + クエリパラメータであるため、ここでは内部的に webClient.Do() の拡張機能を使用します。
 func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([]byte, error) {
 	// 1. URLとクエリパラメータの組み立て
 	queryURL := fmt.Sprintf("%s/audio_query", c.apiURL)
@@ -49,19 +42,6 @@ func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([
 	fullURL := queryURL + "?" + params.Encode()
 
 	// 2. リクエスト実行:
-	// webclient.Client には FetchBytes と PostJSONAndFetchBytes しかないため、
-	// 空のPOSTリクエストは、汎用のDoメソッドを使うか、FetchBytesの代わりにカスタムFetchPOSTを作成するべきですが、
-	// ここではシンプルに Get メソッドを利用してリクエストを準備し、リトライロジックに委譲します。
-	// ただし、VOICEVOXの /audio_query は**空のPOST**であるため、FetchBytesは使えません。
-	// したがって、リトライを含んだPOST機能を webclient.Client に実装していない限り、
-	// ここは以前のコードのように webClient.Do() に頼るしかありませんが、
-	// **webClient.Do() はリトライを処理しますが、ステータスコードエラー処理がVOICEVOXクライアント側に残ってしまいます。**
-
-	// **暫定修正案 (webClient.Doに依存する):**
-	// **webClient.Clientは webclient.Doer インターフェースを満たすため、Do()が呼び出し可能です。**
-	// **リトライは webClient.Do() の実装内で処理されるため、このコードは機能的に正しいです。**
-
-	// 既存コードを最小限に修正: HandleLimitedResponse は webclient の内部実装に依存せず、io.LimitReader を使っているため、そのまま利用できます。
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("オーディオクエリ POST リクエスト作成失敗: %w", err)
@@ -79,8 +59,6 @@ func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([
 	if err != nil {
 		return nil, fmt.Errorf("オーディオクエリ実行後のレスポンス読み込み失敗: %w", err)
 	}
-
-	// ... 後続のステータスコードチェックとJSONチェックは維持 ...
 
 	// 4. 最終的なステータスコードチェック
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
@@ -133,10 +111,6 @@ func (c *Client) runSynthesis(queryBody []byte, styleID int, ctx context.Context
 // webclient.Client の FetchBytes は []byte を返すため、ここでは Get メソッドを削除するか、
 // FetchBytes のラッパーとして再定義し、戻り値を []byte に変更します。
 // Get(*http.Response, error) を返すのは、client.Do() のシグネチャであり、client.FetchBytes の意図に反します。
-
-// **代替案として、この Get メソッドを削除するか、または外部に公開する必要がある機能 (FetchBytes) のみに限定します。**
-// **この voicevox パッケージの関心は音声合成にあるため、この汎用 Get は不要と考え、削除します。**
-
 func (c *Client) Get(url string, ctx context.Context) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
