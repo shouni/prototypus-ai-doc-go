@@ -1,6 +1,6 @@
 module prototypus-ai-doc-go
 
-go 1.25
+go 1.24.0
 
 require (
 	github.com/shouni/go-ai-client/v2 v2.0.2
