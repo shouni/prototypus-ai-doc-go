@@ -93,8 +93,8 @@ func initCmdFlags() {
 	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "", "生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
 	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "duet", "スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
 	generateCmd.Flags().BoolVarP(&opts.PostAPI, "post-api", "p", false, "生成されたスクリプトを外部APIに投稿します。")
-	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "w", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "w", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。-v は --verbose と競合するため -w に変更。")
 	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", 30*time.Second, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 	generateCmd.Flags().StringVarP(&opts.AIAPIKey, "ai-api-key", "k", "", "Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
-	generateCmd.Flags().StringVarP(&opts.AIModel, "ai-model", "M", "", "使用するGeminiモデル名。ルートの --model フラグを上書きします。")
+	generateCmd.Flags().StringVarP(&opts.AIModel, "ai-model", "g", "", "使用するGeminiモデル名。ルートの --model フラグを上書きします。")
 }

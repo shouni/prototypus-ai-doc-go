@@ -125,15 +125,16 @@ prototypus-ai-doc generate [flags]
 
 入力ソースは **`--script-url`, `--script-file` のいずれか一つのみ**指定可能です。
 
-| フラグ | 短縮形 | 説明 |
-| :--- | :--- | :--- |
+| フラグ | 短縮形  | 説明 |
+| :--- |:---| :--- |
 | `--script-url` | `-u` | **入力ソースURL**。Webページから記事本文を抽出し、AIに渡します。 |
 | `--script-file` | `-f` | **入力スクリプトファイルのパス**。`'-'` を指定すると標準入力から読み込みます。 |
 | `--output-file` | `-o` | 生成されたスクリプトを保存するファイル名。省略時は標準出力に出力。 |
 | `--mode` | `-m` | スクリプトの形式: **`solo`** (モノローグ/デフォルト), **`dialogue`** (対話), **`duet`** (交互ナレーション)。**(Default: `duet`)** |
-| `--voicevox` | `-v` | 生成されたスクリプトをVOICEVOXで合成し、指定されたファイル名 (`.wav`) で保存します。**他の出力フラグと同時に指定できません。** |
+| `--voicevox` | `-w` | 生成されたスクリプトをVOICEVOXで合成し、指定されたファイル名 (`.wav`) で保存します。**他の出力フラグと同時に指定できません。** |
 | `--post-api` | `-p` | 生成されたスクリプトを `POST_API_URL` に投稿します。 |
-| **`--http-timeout`** | (なし) | **Webリクエストのタイムアウト時間**を設定します (例: `15s`, `1m`)。**(Default: 30s)** |
+| `--ai-api-key` | `-k` | **Google Gemini APIキー**。環境変数 `GEMINI_API_KEY` を上書きします。 |
+| `--http-timeout` | (なし) | **Webリクエストのタイムアウト時間**を設定します (例: `15s`, `1m`)。**(Default: 30s)** |
 
 -----
 
@@ -162,14 +163,15 @@ VOICEVOXエンジンと環境変数が設定済みであることを前提とし
     --output-file -  # 標準出力への明示的な指定 (省略可能)
 ```
 
-### 例 3: 標準入力 (パイプ) から読み込み、外部APIに投稿
+### 例 3: 標準入力 (パイプ) から読み込み、外部APIに投稿（APIキーを直接指定）
 
 ```bash
 # cat コマンドの出力をパイプで渡し、生成したスクリプトを外部APIに POST
 cat my_draft.txt | ./bin/prototypus-ai-doc generate \
     --script-file - \
     --mode duet \
-    --post-api
+    --post-api \
+    --ai-api-key "YOUR_SECRET_API_KEY"
 ```
 
 -----
@@ -177,5 +179,3 @@ cat my_draft.txt | ./bin/prototypus-ai-doc generate \
 ### 📜 ライセンス (License)
 
 このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
-
-
