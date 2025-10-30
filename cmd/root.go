@@ -39,7 +39,7 @@ func newRootCmd(appName string) *cobra.Command {
 	}
 
 	// 1. clibase 共通フラグを手動で追加
-	rootCmd.PersistentFlags().BoolVarP(&gcbase.Flags.Verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().BoolVarP(&gcbase.Flags.Verbose, "verbose", "V", false, "Enable verbose output")
 	rootCmd.PersistentFlags().StringVarP(&gcbase.Flags.ConfigFile, "config", "c", "", "Config file path")
 
 	// 2. アプリケーション固有のフラグを手動で追加
