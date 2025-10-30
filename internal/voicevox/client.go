@@ -14,7 +14,6 @@ import (
 // Client はVOICEVOXエンジンへのAPIリクエストを処理するクライアントです。
 // webclient.Client (リトライ機能付きHTTPクライアント) に依存します。
 type Client struct {
-	// webclient.Client は FetchBytes や PostJSONAndFetchBytes を持つ構造体
 	webClient *webexact.Client
 	apiURL    string
 }
@@ -53,7 +52,6 @@ func (c *Client) runAudioQuery(text string, styleID int, ctx context.Context) ([
 		return nil, fmt.Errorf("オーディオクエリ実行失敗 (リトライ後): %w", err)
 	}
 
-	// webclient.Client の HandleLimitedResponse は内部的に resp.Body.Close() を呼ぶため、defer は不要
 	// 3. レスポンス処理
 	queryBody, err := webexact.HandleLimitedResponse(resp, webexact.MaxResponseBodySize)
 	if err != nil {
@@ -95,7 +93,6 @@ func (c *Client) runSynthesis(queryBody []byte, styleID int, ctx context.Context
 	fullURL := synthURL + "?" + synthParams.Encode()
 	wavData, err := c.webClient.PostJSONAndFetchBytes(fullURL, json.RawMessage(queryBody), ctx)
 	if err != nil {
-		// webclient.Client のエラーは既にリトライとステータスコードエラーを含んでいます。
 		return nil, fmt.Errorf("音声合成実行失敗: %w", err)
 	}
 
@@ -107,10 +104,7 @@ func (c *Client) runSynthesis(queryBody []byte, styleID int, ctx context.Context
 	return wavData, nil
 }
 
-// Get は汎用のGETリクエストを実行します。（リトライを含む webclient.Client の FetchBytes に委譲）
-// webclient.Client の FetchBytes は []byte を返すため、ここでは Get メソッドを削除するか、
-// FetchBytes のラッパーとして再定義し、戻り値を []byte に変更します。
-// Get(*http.Response, error) を返すのは、client.Do() のシグネチャであり、client.FetchBytes の意図に反します。
+// Get は汎用のGETリクエストを実行します。
 func (c *Client) Get(url string, ctx context.Context) ([]byte, error) {
 	// webClient.FetchBytes は内部でリクエスト作成、実行、レスポンス処理、ボディクローズを行います。
 	data, err := c.webClient.FetchBytes(url, ctx)
