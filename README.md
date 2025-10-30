@@ -133,7 +133,6 @@ prototypus-ai-doc generate [flags]
 | `--mode` | `-m` | スクリプトの形式: **`solo`** (モノローグ/デフォルト), **`dialogue`** (対話), **`duet`** (交互ナレーション)。**(Default: `duet`)** |
 | `--voicevox` | `-w` | 生成されたスクリプトをVOICEVOXで合成し、指定されたファイル名 (`.wav`) で保存します。**他の出力フラグと同時に指定できません。** |
 | `--post-api` | `-p` | 生成されたスクリプトを `POST_API_URL` に投稿します。 |
-| `--ai-api-key` | `-k` | **Google Gemini APIキー**。環境変数 `GEMINI_API_KEY` を上書きします。 |
 | `--http-timeout` | (なし) | **Webリクエストのタイムアウト時間**を設定します (例: `15s`, `1m`)。**(Default: 30s)** |
 
 -----

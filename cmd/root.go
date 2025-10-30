@@ -51,8 +51,7 @@ func newRootCmd(appName string) *cobra.Command {
 // addAppFlags は、アプリケーション固有の永続フラグ（--model）を追加します。
 func addAppFlags(rootCmd *cobra.Command) {
 	defaultModel := "gemini-2.5-flash"
-	rootCmd.PersistentFlags().StringVarP(&model, "model", "", defaultModel,
-		"使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
+	rootCmd.PersistentFlags().StringVarP(&model, "model", "g", defaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
 }
 
 // preRunAppE は、アプリケーション固有の実行前チェック（GEMINI_API_KEY）を実行します。
