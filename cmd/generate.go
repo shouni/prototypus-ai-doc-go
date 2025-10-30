@@ -5,11 +5,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/shouni/go-web-exact/pkg/httpclient"
-	"github.com/shouni/go-web-exact/pkg/web"
-	"github.com/spf13/cobra"
 	"prototypus-ai-doc-go/internal/generator"
 	"prototypus-ai-doc-go/internal/voicevox"
+
+	"github.com/shouni/go-web-exact/v2/pkg/client"
+	"github.com/shouni/go-web-exact/v2/pkg/extract"
+	"github.com/spf13/cobra"
 )
 
 // グローバルなオプションインスタンス。
@@ -28,9 +29,22 @@ Webページやファイル、標準入力から文章を読み込むことが�
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
+		// --- タイムアウト値の調整 ---
+		// フラグが指定されなかった場合、opts.HTTPTimeoutはDurationのゼロ値(0)になる。
+		// その場合は、init()で設定したデフォルト値(30s)を明示的に使用する。
+		httpTimeout := opts.HTTPTimeout
+		if httpTimeout == 0 {
+			httpTimeout = 30 * time.Second
+		}
+
 		// 共通依存関係の初期化 (HTTPクライアント/Extractor)
-		fetcher := httpclient.New(opts.HTTPTimeout)
-		extractor := web.NewExtractor(fetcher)
+		fetcher := client.New(httpTimeout, client.WithMaxRetries(5))
+
+		// NewExtractorがエラーを返すため、チェックを追加
+		extractor, err := extract.NewExtractor(fetcher)
+		if err != nil {
+			return fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
+		}
 
 		// VOICEVOX Clientの初期化（DIの徹底）
 		var voicevoxClient *voicevox.Client
@@ -40,6 +54,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 				voicevoxAPIURL = defaultVoicevoxAPIURL
 				fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
 			}
+			// fetcher を Voicevox Client の Doer として渡す
 			voicevoxClient = voicevox.NewClient(voicevoxAPIURL, fetcher)
 		}
 

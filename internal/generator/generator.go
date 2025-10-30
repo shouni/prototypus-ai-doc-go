@@ -15,8 +15,8 @@ import (
 	"prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/voicevox"
 
-	"github.com/shouni/go-ai-client/pkg/ai/gemini"
-	"github.com/shouni/go-web-exact/pkg/web"
+	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
+	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
 const MinInputContentLength = 10
@@ -63,7 +63,7 @@ type GenerateOptions struct {
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateHandler struct {
 	Options        GenerateOptions
-	Extractor      *web.Extractor
+	Extractor      *extract.Extractor
 	VoicevoxClient *voicevox.Client
 }
 

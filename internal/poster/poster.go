@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	httpclient "github.com/shouni/go-web-exact/pkg/httpclient"
+	httpclient "github.com/shouni/go-web-exact/v2/pkg/client"
 )
 
 // PostPayload はAPIに送信するデータの構造体です。

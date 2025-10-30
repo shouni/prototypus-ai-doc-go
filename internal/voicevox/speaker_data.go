@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"strings"
 )
 
@@ -66,6 +64,7 @@ type VVSpeaker struct {
 }
 
 // LoadSpeakers は /speakers エンドポイントからデータを取得し、SpeakerDataを構築します。
+// client.Get() は []byte を返し、通信エラーやステータスコードエラーはエラーとして返ると仮定します。
 func LoadSpeakers(ctx context.Context, client *Client) (*SpeakerData, error) {
 	// 1. 静的なSupportedSpeakersから、内部使用のためのマップを構築
 	apiNameToToolTag := make(map[string]string)
@@ -75,20 +74,25 @@ func LoadSpeakers(ctx context.Context, client *Client) (*SpeakerData, error) {
 
 	speakersURL := fmt.Sprintf("%s/speakers", client.apiURL)
 
-	resp, err := client.Get(speakersURL, ctx)
+	// 変更点1: client.Get() は []byte を返すため、 resp や defer resp.Body.Close() を削除
+	bodyBytes, err := client.Get(speakersURL, ctx)
+
+	// 変更点2: 通信エラーや 4xx/5xx ステータスコードエラーは client.Get() がエラーとして返すと仮定
 	if err != nil {
 		return nil, fmt.Errorf("/speakers API呼び出し失敗。VOICEVOXエンジンが起動しているか確認してください: %w", err)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		errorBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("/speakers APIがエラーを返しました: Status %d, Body: %s", resp.StatusCode, string(errorBody))
-	}
+	// 変更点3: ステータスコードチェックとエラーボディ読み込みのロジックを削除
 
 	var vvSpeakers []VVSpeaker
-	if err := json.NewDecoder(resp.Body).Decode(&vvSpeakers); err != nil {
-		return nil, fmt.Errorf("/speakers 応答のJSONデコード失敗: %w", err)
+	// 変更点4: bodyBytes から直接 JSON デコード（Unmarshal）
+	if err := json.Unmarshal(bodyBytes, &vvSpeakers); err != nil {
+		// JSON デコード失敗時のデバッグ情報
+		bodyDisplay := string(bodyBytes)
+		if len(bodyDisplay) > 100 {
+			bodyDisplay = bodyDisplay[:100] + "..."
+		}
+		return nil, fmt.Errorf("/speakers 応答のJSONデコード失敗。返されたボディ: %s。エラー: %w", bodyDisplay, err)
 	}
 
 	data := &SpeakerData{
@@ -99,7 +103,7 @@ func LoadSpeakers(ctx context.Context, client *Client) (*SpeakerData, error) {
 
 	// 応答データから StyleIDMap と DefaultStyleMap を構築
 	for _, spk := range vvSpeakers {
-		// 変更点: 内部マップ 'apiNameToToolTag' を使用
+		// 内部マップ 'apiNameToToolTag' を使用
 		toolTag, tagFound := apiNameToToolTag[spk.Name]
 
 		if !tagFound {
@@ -129,7 +133,7 @@ func LoadSpeakers(ctx context.Context, client *Client) (*SpeakerData, error) {
 		toolTag := mapping.ToolTag
 		if _, ok := data.DefaultStyleMap[toolTag]; !ok {
 			slog.Error("必須話者のデフォルトスタイルが見つかりません", "speaker", toolTag, "required_style", VvTagNormal)
-			missingDefaults = append(missingDefaults, toolTag)
+			missingDefaults = append(missingDefaults, mapping.APIName)
 		}
 	}
 
