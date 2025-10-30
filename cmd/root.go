@@ -14,9 +14,6 @@ var (
 	model string
 )
 
-// 【外部ファイルの参照】: generateCmd と initCmdFlags は、cmd/generate.go で定義されています。
-// このファイル内での再宣言は競合の原因となるため、宣言はしません。
-
 // ルートコマンドの基盤を作成するヘルパー関数
 // gcbaseの Execute に依存せず、cobraを直接使用してルートコマンドを構築します。
 func newRootCmd(appName string) *cobra.Command {

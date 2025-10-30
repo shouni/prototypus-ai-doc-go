@@ -93,8 +93,6 @@ func initCmdFlags() {
 	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "", "生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
 	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "duet", "スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
 	generateCmd.Flags().BoolVarP(&opts.PostAPI, "post-api", "p", false, "生成されたスクリプトを外部APIに投稿します。")
-
-	// 【修正】ショートオプションを -w に変更し、clibaseの -v (verbose) との競合を回避
 	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "w", "",
 		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
 
