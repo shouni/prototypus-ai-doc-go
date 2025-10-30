@@ -40,8 +40,7 @@ func newRootCmd(appName string) *cobra.Command {
 // addAppFlags は、アプリケーション固有の永続フラグ（--model）を追加します。
 func addAppFlags(rootCmd *cobra.Command) {
 	defaultModel := "gemini-2.5-flash"
-	rootCmd.PersistentFlags().StringVarP(&model, "model", "", defaultModel,
-		"使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
+	rootCmd.PersistentFlags().StringVarP(&model, "model", "", defaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
 }
 
 // preRunAppE は、アプリケーション固有の実行前チェック（GEMINI_API_KEY）を実行します。
@@ -72,13 +71,8 @@ func Execute() {
 	}
 
 	// 2. gcbase.Execute のシグネチャに合わせるため、ルートコマンドを独自に構築し、gcbase.Executeは使用しないか、
-	//    gcbase.Execute が root.go で定義されていた元のコードを復元する
-
-	// 今回は、gcbase.Executeがコールバックを受け取らない前提で、gcbase.Executeを使わずにcobraを直接実行します。
-	// (gcbaseモジュールのExecuteは、ルートコマンドを構築し、AddCommandを実行するだけのため、手動で再現します。)
 	rootCmd := newRootCmd(appName)
 	rootCmd.AddCommand(cmds...)
-
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
