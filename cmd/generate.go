@@ -5,11 +5,12 @@ import (
 	"os"
 	"time"
 
+	"prototypus-ai-doc-go/internal/generator"
+	"prototypus-ai-doc-go/internal/voicevox"
+
 	"github.com/shouni/go-web-exact/v2/pkg/client"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 	"github.com/spf13/cobra"
-	"prototypus-ai-doc-go/internal/generator"
-	"prototypus-ai-doc-go/internal/voicevox"
 )
 
 // グローバルなオプションインスタンス。
