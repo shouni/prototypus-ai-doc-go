@@ -170,8 +170,7 @@ VOICEVOXエンジンと環境変数が設定済みであることを前提とし
 cat my_draft.txt | ./bin/prototypus-ai-doc generate \
     --script-file - \
     --mode duet \
-    --post-api \
-    --ai-api-key "YOUR_SECRET_API_KEY"
+    --post-api
 ```
 
 -----
