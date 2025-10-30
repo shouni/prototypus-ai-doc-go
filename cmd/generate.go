@@ -88,23 +88,11 @@ func setupDependencies(ctx context.Context) (generator.GenerateHandler, error) {
 
 // initCmdFlags は generateCmd のフラグ定義を行います。
 func initCmdFlags() {
-	// --- フラグ定義 ---
 	generateCmd.Flags().StringVarP(&opts.ScriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL。")
 	generateCmd.Flags().StringVarP(&opts.ScriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます。)")
-	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "",
-		"生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
-	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "duet",
-		"スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
-	generateCmd.Flags().BoolVarP(&opts.PostAPI, "post-api", "p", false,
-		"生成されたスクリプトを外部APIに投稿します。")
-	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "v", "",
-		"生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
-	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", 30*time.Second,
-		"Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
-
-	// AI クライアント設定フラグ (ルートの --model を上書きするためのもの)
-	generateCmd.Flags().StringVar(&opts.AIAPIKey, "ai-api-key", "",
-		"Google Gemini APIキー。環境変数 GEMINI_API_KEY を上書きします。")
-	generateCmd.Flags().StringVar(&opts.AIModel, "ai-model", "",
-		"使用するGeminiモデル名。ルートの --model フラグを上書きします。")
+	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "", "生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
+	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "duet", "スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
+	generateCmd.Flags().BoolVarP(&opts.PostAPI, "post-api", "p", false, "生成されたスクリプトを外部APIに投稿します。")
+	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "w", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", 30*time.Second, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 }
