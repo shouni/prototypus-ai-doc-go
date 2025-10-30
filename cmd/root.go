@@ -4,52 +4,82 @@ import (
 	"fmt"
 	"os"
 
+	// 正しいインポートパス: github.com/shouni/go-cli-base
+	gcbase "github.com/shouni/go-cli-base"
 	"github.com/spf13/cobra"
 )
 
-// グローバルなフラグ変数を定義
+// グローバルなフラグ変数
 var (
-	// AIモデル名 (例: gemini-2.5-flash)
 	model string
 )
 
-// rootCmd は、引数なしで実行されたときの基点となるコマンドです。
-var rootCmd = &cobra.Command{
-	Use:   "prototypus-ai-doc",
-	Short: "文章をずんだもん＆めたんの対話スクリプトに変換するAI CLIツール",
-	Long: `
-prototypus-ai-doc は、Google Gemini API を利用して、
-与えられた文章を、話者や感情タグ付きのナレーションスクリプトに変換します。
-`,
-	// 全てのコマンド実行前に呼ばれる関数です。
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// 1. GEMINI_API_KEY の必須チェック
-		if os.Getenv("GEMINI_API_KEY") == "" {
-			return fmt.Errorf("エラー: 環境変数 GEMINI_API_KEY が設定されていません。Gemini APIの利用には必須です")
-		}
+// ルートコマンドの基盤を作成するヘルパー関数
+// (以前の clibase.NewRootCmd のロジックの一部を再実装)
+func newRootCmd(appName string) *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   appName,
+		Short: fmt.Sprintf("A CLI tool for %s.", appName),
+		Long:  fmt.Sprintf("The CLI tool for %s. Use a subcommand to perform a task.", appName),
+		// PersistentPreRunEを手動で実装
+		PersistentPreRunE: preRunAppE,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+		},
+	}
+	// 共通フラグを手動で追加
+	rootCmd.PersistentFlags().BoolVarP(&gcbase.Flags.Verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().StringVarP(&gcbase.Flags.ConfigFile, "config", "c", "", "Config file path")
 
-		// 2. モデル名のバリデーション（必要に応じてここにチェックを追加できます）
+	// アプリケーション固有のフラグを手動で追加
+	addAppFlags(rootCmd)
 
-		return nil
-	},
-	// サブコマンドを持たない場合の実行ロジック（今回はサブコマンドを必須とするため空）
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
+	return rootCmd
 }
 
-// Execute は、rootCmd を実行するメイン関数です。
-// main.go から呼び出されます。
+// addAppFlags は、アプリケーション固有の永続フラグ（--model）を追加します。
+func addAppFlags(rootCmd *cobra.Command) {
+	defaultModel := "gemini-2.5-flash"
+	rootCmd.PersistentFlags().StringVarP(&model, "model", "", defaultModel,
+		"使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
+}
+
+// preRunAppE は、アプリケーション固有の実行前チェック（GEMINI_API_KEY）を実行します。
+// これは rootCmd の PersistentPreRunE として機能します。
+func preRunAppE(cmd *cobra.Command, args []string) error {
+	// 1. clibase 共通の PersistentPreRun 処理をここで実行 (clibase.Executeがしてくれないため)
+	if gcbase.Flags.Verbose {
+		fmt.Println("Verbose mode enabled by clibase (manual check).")
+	}
+
+	// 2. GEMINI_API_KEY の必須チェック
+	if os.Getenv("GEMINI_API_KEY") == "" {
+		return fmt.Errorf("エラー: 環境変数 GEMINI_API_KEY が設定されていません。Gemini APIの利用には必須です")
+	}
+	return nil
+}
+
+// Execute は、アプリケーションのメインエントリポイントです。
 func Execute() {
+	appName := "prototypus-ai-doc"
+
+	// 1. サブコマンドのフラグ定義とサブコマンドリストの作成
+	var cmds []*cobra.Command
+	if generateCmd != nil {
+		// フラグ定義をcobraが読み取る前に実行
+		initCmdFlags()
+		cmds = append(cmds, generateCmd)
+	}
+
+	// 2. gcbase.Execute のシグネチャに合わせるため、ルートコマンドを独自に構築し、gcbase.Executeは使用しないか、
+	//    gcbase.Execute が root.go で定義されていた元のコードを復元する
+
+	// 今回は、gcbase.Executeがコールバックを受け取らない前提で、gcbase.Executeを使わずにcobraを直接実行します。
+	// (gcbaseモジュールのExecuteは、ルートコマンドを構築し、AddCommandを実行するだけのため、手動で再現します。)
+	rootCmd := newRootCmd(appName)
+	rootCmd.AddCommand(cmds...)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-}
-
-func init() {
-	// ここで永続フラグ（すべてのサブコマンドで利用可能）を定義します。
-
-	// --model フラグの定義
-	rootCmd.PersistentFlags().StringVarP(&model, "model", "", "gemini-2.5-flash",
-		"使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
 }

@@ -42,6 +42,8 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/shouni/go-ai-client/v2 v2.0.2 h1:9fej/MkJPAWv1M8Ljdbu2hmEkhFix9rpnQtMrCfpVpA=
 github.com/shouni/go-ai-client/v2 v2.0.2/go.mod h1:/qv/8cVRGaEBVJaRpe77wgHDwr80swJ6FumSHHoMJPI=
+github.com/shouni/go-cli-base v1.0.1 h1:ueNPraPtats/O/Cbs2qXJNebzeN/76EEHseRMq1DV3w=
+github.com/shouni/go-cli-base v1.0.1/go.mod h1:JS37gkTZvoQVvHypxD4KyNr00EHlsYWtPOQTeCDKD7E=
 github.com/shouni/go-utils v1.0.2 h1:dZlUgEdW5J6xkD4WHo1+1Hb4PYvFEN4DbDLGuPijfpE=
 github.com/shouni/go-utils v1.0.2/go.mod h1:lR2yRm9jbmGcWdvax/y72Yek9k9iF9nDzBzfyyhSbTw=
 github.com/shouni/go-web-exact/v2 v2.0.2 h1:EzWdCnJUnG+v5L+NvBH3dbjREcBvw7qxfWA2hCr7DlQ=
