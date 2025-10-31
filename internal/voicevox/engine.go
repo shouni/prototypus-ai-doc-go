@@ -101,7 +101,7 @@ func determineStyleID(ctx context.Context, seg scriptSegment, speakerData *Speak
 }
 
 // processSegment は単一のセグメントに対してAPI呼び出しを実行します。
-func processSegment(ctx context.Context, client *Client, seg scriptSegment, speakerData *SpeakerData, index int) segmentResult {
+func processSegment(ctx context.Context, client *Client, seg scriptSegment, index int) segmentResult {
 	// 1. スタイルIDの決定
 	if seg.Err != nil {
 		return segmentResult{index: index, err: seg.Err}
@@ -200,7 +200,7 @@ func PostToEngine(ctx context.Context, scriptContent string, outputWavFile strin
 			segCtx, cancel := context.WithTimeout(ctx, segmentTimeout)
 			defer cancel()
 
-			result := processSegment(segCtx, client, seg, speakerData, i)
+			result := processSegment(segCtx, client, seg, i)
 			resultsChan <- result
 
 		}(i, seg)
