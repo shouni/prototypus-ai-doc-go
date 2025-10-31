@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/shouni/go-ai-client/v2 v2.0.2
-	github.com/shouni/go-cli-base v1.0.1
+	github.com/shouni/go-cli-base v1.0.4
 	github.com/shouni/go-web-exact/v2 v2.0.2
 	github.com/spf13/cobra v1.10.1
 )
@@ -26,7 +26,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/shouni/go-utils v1.0.2 // indirect
-	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
 	go.opentelemetry.io/otel v1.37.0 // indirect
