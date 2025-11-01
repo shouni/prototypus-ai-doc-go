@@ -237,9 +237,9 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 		return errors.New("内部エラー: VoicevoxClientが初期化されていません")
 	}
 
+	// generator/HandleVoicevoxOutput 関数内
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-
-	loadCtx, cancel := context.WithTimeout(ctx, 10)
+	loadCtx, cancel := context.WithTimeout(ctx, h.Options.HTTPTimeout)
 	defer cancel()
 	speakerData, err := voicevox.LoadSpeakers(loadCtx, client)
 	if err != nil {
