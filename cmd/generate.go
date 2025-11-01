@@ -45,7 +45,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 }
 
 func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
-	// AI APIキーは環境変数からのみ取得 (clibaseの PersistentPreRunE で GEMINI_API_KEY の存在は保証済みと想定)
+	// AI APIキーは環境変数からのみ取得
 	finalAPIKey := os.Getenv("GEMINI_API_KEY")
 
 	if finalAPIKey == "" {
@@ -80,7 +80,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 		return pipeline.GenerateHandler{}, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
 
-	// 2. Gemini Clientの初期化
+	// 2. AIクライアントの初期化
 	aiClient, err := initializeAIClient(ctx)
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
