@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"prototypus-ai-doc-go/internal/generator"
-	"prototypus-ai-doc-go/internal/voicevox"
 
-	"github.com/shouni/go-web-exact/v2/pkg/client"
+	"github.com/shouni/go-http-kit/pkg/httpkit"
+	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 	"github.com/spf13/cobra"
 )
@@ -57,8 +57,7 @@ func setupDependencies(ctx context.Context) (generator.GenerateHandler, error) {
 	}
 
 	// 1. 共通依存関係の初期化 (HTTPクライアント/Extractor)
-	fetcher := client.New(httpTimeout, client.WithMaxRetries(5))
-
+	fetcher := httpkit.New(httpTimeout, httpkit.WithMaxRetries(3))
 	extractor, err := extract.NewExtractor(fetcher)
 	if err != nil {
 		return generator.GenerateHandler{}, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
@@ -72,8 +71,7 @@ func setupDependencies(ctx context.Context) (generator.GenerateHandler, error) {
 			voicevoxAPIURL = defaultVoicevoxAPIURL
 			fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
 		}
-		// fetcher を Voicevox Client の Doer として渡す
-		voicevoxClient = voicevox.NewClient(voicevoxAPIURL, fetcher)
+		voicevoxClient = voicevox.NewClient(voicevoxAPIURL, httpTimeout)
 	}
 
 	// 3. Handlerに依存関係を注入

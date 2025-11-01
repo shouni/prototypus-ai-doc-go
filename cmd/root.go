@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	// gcbase はフラグや共通構造体を利用するためにのみインポートを維持します。
 	gcbase "github.com/shouni/go-cli-base"
 	"github.com/spf13/cobra"
 )

@@ -13,9 +13,9 @@ import (
 	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
 	"prototypus-ai-doc-go/internal/prompt"
-	"prototypus-ai-doc-go/internal/voicevox"
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
+	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
@@ -237,9 +237,11 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 		return errors.New("内部エラー: VoicevoxClientが初期化されていません")
 	}
 
+	// generator/HandleVoicevoxOutput 関数内
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-
-	speakerData, err := voicevox.LoadSpeakers(ctx, client)
+	loadCtx, cancel := context.WithTimeout(ctx, h.Options.HTTPTimeout)
+	defer cancel()
+	speakerData, err := voicevox.LoadSpeakers(loadCtx, client)
 	if err != nil {
 		return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 	}
@@ -247,15 +249,11 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 
 	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
 
-	// ★ 修正: voicevox.PostToEngineの呼び出しに新しい引数 (fallbackTag) を追加
-	err = voicevox.PostToEngine(
-		ctx,
-		generatedScript,
-		h.Options.VoicevoxOutput,
-		speakerData,
-		client,
-		h.Options.VoicevoxFallbackTag, // ★ 追加された引数
-	)
+	// 3. パーサーの初期化と Engine への依存性注入
+	parser := voicevox.NewTextParser()
+	engine := voicevox.NewEngine(client, speakerData, parser)
+	err = engine.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
+
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 	}
