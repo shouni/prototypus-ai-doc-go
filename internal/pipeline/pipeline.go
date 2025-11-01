@@ -22,7 +22,7 @@ import (
 const MinInputContentLength = 10
 
 // --------------------------------------------------------------------------------
-// 構造体定義
+// 構造体定義 (変更なし)
 // --------------------------------------------------------------------------------
 
 // GenerateOptions はコマンドラインフラグを保持する構造体です。
@@ -221,12 +221,14 @@ func (h *GenerateHandler) loadVoicevoxSpeakerData(ctx context.Context) (*voicevo
 	if err != nil {
 		return nil, fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 	}
+
+	// 💡 修正 L198: 成功した場合にのみ完了メッセージを出力
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータのロード完了。")
 	return speakerData, nil
 }
 
 // handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
-func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error { // 💡 変更: handleVoicevoxOutput
+func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
 	if h.Options.VoicevoxOutput == "" {
 		return nil
 	}
@@ -273,18 +275,19 @@ func (h *GenerateHandler) generatePostTitle(inputContent []byte) string {
 		return h.Options.OutputFile
 	}
 
-	const maxLen = 50
 	inputStr := string(inputContent)
 
-	if len(inputStr) > 0 {
-		preview := inputStr
-		if len(inputStr) > maxLen {
-			preview = inputStr[:maxLen] + "..."
-		}
-		return fmt.Sprintf("Generated Script (Stdin/File Preview): %s", preview)
+	if len(inputStr) == 0 {
+		return fmt.Sprintf("Generated Script (Empty Input) - Mode: %s", h.Options.Mode)
 	}
 
-	return fmt.Sprintf("Generated Script (Empty Input) - Mode: %s", h.Options.Mode)
+	const maxLen = 50
+	preview := inputStr
+	if len(inputStr) > maxLen {
+		preview = inputStr[:maxLen] + "..."
+	}
+
+	return fmt.Sprintf("Generated Script (Stdin/File Preview): %s", preview)
 }
 
 // handlePostAPI は生成されたスクリプトを外部APIに投稿します。
