@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	httpclient "github.com/shouni/go-web-exact/v2/pkg/client"
+	"github.com/shouni/go-http-kit/pkg/httpkit"
 )
 
 // PostPayload はAPIに送信するデータの構造体です。
@@ -33,8 +33,8 @@ func PostToAPI(title string, mode string, scriptContent string) error {
 
 	// 独自のクライアントを初期化（タイムアウトはライブラリの既定値を使用）
 	// ポスターにはタイムアウトフラグがないため、ここでクライアントのデフォルトを使用
-	client := httpclient.New(httpclient.DefaultHTTPTimeout)
-	ctx, cancel := context.WithTimeout(context.Background(), httpclient.DefaultHTTPTimeout)
+	client := httpkit.New(httpkit.DefaultHTTPTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), httpkit.DefaultHTTPTimeout)
 	defer cancel()
 
 	// PostJSONAndFetchBytes を呼び出し
