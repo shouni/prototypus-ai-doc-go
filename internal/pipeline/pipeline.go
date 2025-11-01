@@ -1,4 +1,4 @@
-package generator
+package pipeline
 
 import (
 	"bytes"
@@ -31,17 +31,6 @@ func (h *GenerateHandler) readFileContent(filePath string) ([]byte, error) {
 	return os.ReadFile(filePath)
 }
 
-// resolveAPIKey は環境変数とフラグからAPIキーを決定します。
-func (h *GenerateHandler) resolveAPIKey(flagKey string) string {
-	if flagKey != "" {
-		return flagKey
-	}
-	if os.Getenv("GEMINI_API_KEY") != "" {
-		return os.Getenv("GEMINI_API_KEY")
-	}
-	return os.Getenv("GOOGLE_API_KEY")
-}
-
 // --------------------------------------------------------------------------------
 // 構造体定義
 // --------------------------------------------------------------------------------
@@ -54,7 +43,6 @@ type GenerateOptions struct {
 	VoicevoxOutput      string
 	ScriptURL           string
 	ScriptFile          string
-	AIAPIKey            string
 	AIModel             string
 	HTTPTimeout         time.Duration
 	VoicevoxFallbackTag string
@@ -64,6 +52,7 @@ type GenerateOptions struct {
 type GenerateHandler struct {
 	Options        GenerateOptions
 	Extractor      *extract.Extractor
+	AiClient       *gemini.Client
 	VoicevoxClient *voicevox.Client
 }
 
@@ -79,24 +68,18 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 		return err
 	}
 
-	// 2. AIクライアントの初期化
-	aiClient, err := h.InitializeAIClient(ctx)
-	if err != nil {
-		return err
-	}
-
 	// ログ出力
 	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", h.Options.Mode, h.Options.AIModel, len(inputContent))
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
-	// 3. プロンプトの構築
+	// 2. プロンプトの構築
 	promptContent, err := h.BuildFullPrompt(string(inputContent))
 	if err != nil {
 		return err
 	}
 
-	// 4. AIによるスクリプト生成
-	generatedResponse, err := aiClient.GenerateContent(ctx, promptContent, h.Options.AIModel)
+	// 3. AIによるスクリプト生成
+	generatedResponse, err := h.AiClient.GenerateContent(ctx, promptContent, h.Options.AIModel)
 	if err != nil {
 		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
@@ -107,7 +90,7 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	fmt.Fprintln(os.Stderr, generatedScript)
 	fmt.Fprintln(os.Stderr, "------------------------------------")
 
-	// 5. VOICEVOX出力の処理
+	// 4. VOICEVOX出力の処理
 	if err := h.HandleVoicevoxOutput(ctx, generatedScript); err != nil {
 		return err
 	}
@@ -115,12 +98,12 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 		return nil // VOICEVOX出力が成功した場合、ここで処理を終了
 	}
 
-	// 6. 通常のI/O出力
+	// 5. 通常のI/O出力
 	if err := h.HandleFinalOutput(generatedScript); err != nil {
 		return err
 	}
 
-	// 7. API投稿オプションの処理
+	// 6. API投稿オプションの処理
 	return h.HandlePostAPI(inputContent, generatedScript)
 }
 
@@ -180,26 +163,6 @@ func (h *GenerateHandler) ReadInputContent(ctx context.Context) ([]byte, error) 
 	}
 
 	return inputContent, nil
-}
-
-// InitializeAIClient は AI クライアントを初期化します。
-func (h *GenerateHandler) InitializeAIClient(ctx context.Context) (*gemini.Client, error) {
-	// プライベートメソッドを呼び出す
-	finalAPIKey := h.resolveAPIKey(h.Options.AIAPIKey)
-
-	if finalAPIKey == "" {
-		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY またはフラグ --ai-api-key を確認してください。")
-	}
-
-	clientConfig := gemini.Config{
-		APIKey: finalAPIKey,
-	}
-
-	aiClient, err := gemini.NewClient(ctx, clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
-	}
-	return aiClient, nil
 }
 
 // BuildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。

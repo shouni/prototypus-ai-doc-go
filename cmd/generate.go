@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
-	"prototypus-ai-doc-go/internal/generator"
+	"prototypus-ai-doc-go/internal/pipeline"
 
+	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
@@ -15,7 +17,7 @@ import (
 )
 
 // グローバルなオプションインスタンス。
-var opts generator.GenerateOptions
+var opts pipeline.GenerateOptions
 
 // defaultVoicevoxAPIURL は、VOICEVOX APIのデフォルトURLです。
 const defaultVoicevoxAPIURL = "http://localhost:50021"
@@ -42,9 +44,28 @@ Webページやファイル、標準入力から文章を読み込むことが�
 	},
 }
 
+func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
+	// AI APIキーは環境変数からのみ取得 (clibaseの PersistentPreRunE で GEMINI_API_KEY の存在は保証済みと想定)
+	finalAPIKey := os.Getenv("GEMINI_API_KEY")
+
+	if finalAPIKey == "" {
+		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY を確認してください。")
+	}
+
+	clientConfig := gemini.Config{
+		APIKey: finalAPIKey,
+	}
+
+	aiClient, err := gemini.NewClient(ctx, clientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
+	}
+	return aiClient, nil
+}
+
 // setupDependencies は、RunEの実行に必要な全ての依存関係（クライアント、エクストラクタなど）を初期化し、
 // RunGenerateを実行するためのHandlerを返します。
-func setupDependencies(ctx context.Context) (generator.GenerateHandler, error) {
+func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	// --- タイムアウト値の調整 ---
 	// opts.HTTPTimeoutがゼロ値の場合、デフォルト値を使用
 	httpTimeout := opts.HTTPTimeout
@@ -56,10 +77,16 @@ func setupDependencies(ctx context.Context) (generator.GenerateHandler, error) {
 	fetcher := httpkit.New(httpTimeout, httpkit.WithMaxRetries(3))
 	extractor, err := extract.NewExtractor(fetcher)
 	if err != nil {
-		return generator.GenerateHandler{}, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
+		return pipeline.GenerateHandler{}, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
 
-	// 2. VOICEVOX Clientの初期化
+	// 2. Gemini Clientの初期化
+	aiClient, err := initializeAIClient(ctx)
+	if err != nil {
+		return pipeline.GenerateHandler{}, err
+	}
+
+	// 3. VOICEVOX Clientの初期化
 	var voicevoxClient *voicevox.Client
 	if opts.VoicevoxOutput != "" {
 		voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
@@ -71,9 +98,10 @@ func setupDependencies(ctx context.Context) (generator.GenerateHandler, error) {
 	}
 
 	// 3. Handlerに依存関係を注入
-	handler := generator.GenerateHandler{
+	handler := pipeline.GenerateHandler{
 		Options:        opts,
 		Extractor:      extractor,
+		AiClient:       aiClient,
 		VoicevoxClient: voicevoxClient,
 	}
 
