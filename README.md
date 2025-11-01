@@ -33,13 +33,13 @@
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）やサブコマンド構造の構築に使用します。 |
 | **AI モデル** | **Google Gemini API** | 入力された文章を分析し、指定された形式のナレーションスクリプトを生成するために使用します。 |
 | **プロンプト管理** | **`//go:embed`** | プロンプトテンプレートをビルド時に実行ファイル内に埋め込み、管理を容易にします。 |
-| **APIクライアント** | **カスタムHTTPクライアント** (`shouni/go-web-exact`) | Gemini API、VOICEVOX API、および外部POST APIとの通信に使用します。 |
+| **APIクライアント** | **カスタムHTTPクライアント** (`shouni/go-http-kit`) | Gemini API、VOICEVOX API、および外部POST APIとの通信に使用します。 |
 
 -----
 
 ## 🛠️ 独自のネットワーククライアントによる堅牢化
 
-本ツールは、**Webコンテンツの取得、VOICEVOX連携、外部API投稿**を含むすべてのネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ** ([`shouni/go-web-exact`](https://github.com/shouni/go-web-exact)) を使用しています。
+本ツールは、**Webコンテンツの取得、VOICEVOX連携、外部API投稿**を含むすべてのネットワーク通信の堅牢性を確保するため、開発者が独自に設計・実装した**高信頼性HTTPクライアントライブラリ** ([`shouni/go-http-kit`](https://github.com/shouni/go-http-kit)) を使用しています。
 
 ### 1\. Webコンテンツ抽出と通信の分離
 

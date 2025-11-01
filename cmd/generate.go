@@ -32,7 +32,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 		// --- 1. ルートコマンドの永続フラグを反映 ---
 		// root.go で定義された 'model' 変数の値を opts.AIModel にコピーする。
 		if opts.AIModel == "" {
-			opts.AIModel = model // 'model' 変数は cmd/root.go で定義されているグローバル変数
+			opts.AIModel = Model // 'model' 変数は cmd/root.go で定義されているグローバル変数
 		}
 
 		// --- 2. 依存関係をセットアップし、Handlerを取得 ---
