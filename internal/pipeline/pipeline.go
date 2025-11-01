@@ -233,10 +233,6 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 		return nil
 	}
 
-	if h.VoicevoxClient == nil {
-		return errors.New("内部エラー: VoicevoxClientが初期化されていません")
-	}
-
 	speakerData, err := h.loadVoicevoxSpeakerData(ctx)
 	if err != nil {
 		return err
