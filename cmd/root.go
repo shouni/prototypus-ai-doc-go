@@ -8,18 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// グローバルなフラグ変数（--modelの値保持用）
-// これはclibase.Flagsのように、外部からアクセスできるよう維持します。
-var (
-	Model string // 大文字に変更することで、他のパッケージからのアクセスを可能にする
-)
-
-// addAppFlags は、アプリケーション固有の永続フラグ（--model）を追加します。
 // clibase.CustomFlagFunc のシグネチャに一致
 func addAppFlags(rootCmd *cobra.Command) {
-	defaultModel := "gemini-2.5-flash"
-	// clibase が提供する rootCmd に対してフラグを追加する
-	rootCmd.PersistentFlags().StringVarP(&Model, "model", "g", defaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
 }
 
 // preRunAppE は、アプリケーション固有の実行前チェック（GEMINI_API_KEY）を実行します。

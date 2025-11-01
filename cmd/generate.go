@@ -20,6 +20,9 @@ var opts generator.GenerateOptions
 // defaultVoicevoxAPIURL は、VOICEVOX APIのデフォルトURLです。
 const defaultVoicevoxAPIURL = "http://localhost:50021"
 
+// defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
+const defaultModel = "gemini-2.5-flash"
+
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
 	Use:   "generate",
@@ -28,20 +31,11 @@ var generateCmd = &cobra.Command{
 Webページやファイル、標準入力から文章を読み込むことができます。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
-
-		// --- 1. ルートコマンドの永続フラグを反映 ---
-		// root.go で定義された 'model' 変数の値を opts.AIModel にコピーする。
-		if opts.AIModel == "" {
-			opts.AIModel = Model // 'model' 変数は cmd/root.go で定義されているグローバル変数
-		}
-
-		// --- 2. 依存関係をセットアップし、Handlerを取得 ---
 		handler, err := setupDependencies(ctx)
 		if err != nil {
 			return err // 初期化失敗
 		}
 
-		// --- 3. 実行ロジック ---
 		return handler.RunGenerate(ctx)
 	},
 }
@@ -100,4 +94,6 @@ func initCmdFlags() {
 		"voicevox", "v", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
 	generateCmd.Flags().DurationVar(&opts.HTTPTimeout,
 		"http-timeout", 30*time.Second, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
+	generateCmd.Flags().StringVarP(&opts.AIModel,
+		"model", "g", defaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
 }
