@@ -31,11 +31,13 @@ var generateCmd = &cobra.Command{
 Webページやファイル、標準入力から文章を読み込むことができます。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+		// --- 1. 依存関係をセットアップし、Handlerを取得 ---
 		handler, err := setupDependencies(ctx)
 		if err != nil {
 			return err // 初期化失敗
 		}
 
+		// --- 2. 実行ロジック ---
 		return handler.RunGenerate(ctx)
 	},
 }
