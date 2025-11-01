@@ -20,10 +20,9 @@ import (
 )
 
 const MinInputContentLength = 10
-const voicevoxLoadTimeout = 30 * time.Second // スタイルデータロードの固定タイムアウト値を定義
 
 // --------------------------------------------------------------------------------
-// 構造体定義 (変更なし)
+// 構造体定義
 // --------------------------------------------------------------------------------
 
 // GenerateOptions はコマンドラインフラグを保持する構造体です。
@@ -48,13 +47,13 @@ type GenerateHandler struct {
 }
 
 // --------------------------------------------------------------------------------
-// メイン実行ロジック (変更なし)
+// メイン実行ロジック (RunGenerate)
 // --------------------------------------------------------------------------------
 
 // RunGenerate は generate コマンドの実行ロジックです。
 func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	// 1. 入力元から文章を読み込む
-	inputContent, err := h.ReadInputContent(ctx)
+	inputContent, err := h.readInputContent(ctx)
 	if err != nil {
 		return err
 	}
@@ -64,7 +63,7 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	fmt.Println("AIによるスクリプト生成を開始します...")
 
 	// 2. プロンプトの構築
-	promptContent, err := h.BuildFullPrompt(string(inputContent))
+	promptContent, err := h.buildFullPrompt(string(inputContent))
 	if err != nil {
 		return err
 	}
@@ -82,7 +81,7 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	fmt.Fprintln(os.Stderr, "------------------------------------")
 
 	// 4. VOICEVOX出力の処理
-	if err := h.HandleVoicevoxOutput(ctx, generatedScript); err != nil {
+	if err := h.handleVoicevoxOutput(ctx, generatedScript); err != nil {
 		return err
 	}
 	if h.Options.VoicevoxOutput != "" {
@@ -90,16 +89,16 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	}
 
 	// 5. 通常のI/O出力
-	if err := h.HandleFinalOutput(generatedScript); err != nil {
+	if err := h.handleFinalOutput(generatedScript); err != nil {
 		return err
 	}
 
 	// 6. API投稿オプションの処理
-	return h.HandlePostAPI(inputContent, generatedScript)
+	return h.handlePostAPI(inputContent, generatedScript)
 }
 
 // --------------------------------------------------------------------------------
-// ヘルパー関数 (リファクタリング箇所)
+// ヘルパー関数 (入力処理)
 // --------------------------------------------------------------------------------
 
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
@@ -109,7 +108,7 @@ func (h *GenerateHandler) readFileContent(filePath string) ([]byte, error) {
 }
 
 // readFromURL はURLからコンテンツを取得します。
-func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) { // 💡 新規抽出
+func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) {
 	fmt.Printf("URLからコンテンツを取得中: %s (タイムアウト: %s)\n", h.Options.ScriptURL, h.Options.HTTPTimeout.String())
 
 	text, hasBodyFound, err := h.Extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
@@ -123,7 +122,7 @@ func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) { // 
 }
 
 // readFromFile はファイルまたは標準入力からコンテンツを読み込みます。
-func (h *GenerateHandler) readFromFile() ([]byte, error) { // 💡 新規抽出
+func (h *GenerateHandler) readFromFile() ([]byte, error) {
 	if h.Options.ScriptFile == "-" {
 		fmt.Println("標準入力 (stdin) から読み込み中...")
 		content, err := io.ReadAll(os.Stdin)
@@ -133,7 +132,6 @@ func (h *GenerateHandler) readFromFile() ([]byte, error) { // 💡 新規抽出
 		return content, nil
 	}
 
-	// プライベートメソッドを呼び出す
 	content, err := h.readFileContent(h.Options.ScriptFile)
 	if err != nil {
 		return nil, fmt.Errorf("スクリプトファイル '%s' の読み込みに失敗しました: %w", h.Options.ScriptFile, err)
@@ -142,7 +140,7 @@ func (h *GenerateHandler) readFromFile() ([]byte, error) { // 💡 新規抽出
 }
 
 // readFromStdin は引数なしの標準入力からの読み込みを処理します。
-func (h *GenerateHandler) readFromStdin() ([]byte, error) { // 💡 新規抽出
+func (h *GenerateHandler) readFromStdin() ([]byte, error) {
 	fmt.Println("標準入力 (stdin) から読み込み中...")
 	inputContent, err := io.ReadAll(os.Stdin)
 	if err != nil {
@@ -154,8 +152,8 @@ func (h *GenerateHandler) readFromStdin() ([]byte, error) { // 💡 新規抽出
 	return inputContent, nil
 }
 
-// ReadInputContent は入力ソースからコンテンツを読み込みます。
-func (h *GenerateHandler) ReadInputContent(ctx context.Context) ([]byte, error) {
+// readInputContent は入力ソースからコンテンツを読み込みます。
+func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) {
 	// 早期リターン条件チェック
 	if h.Options.VoicevoxOutput != "" && h.Options.OutputFile != "" {
 		return nil, fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
@@ -184,8 +182,12 @@ func (h *GenerateHandler) ReadInputContent(ctx context.Context) ([]byte, error) 
 	return inputContent, nil
 }
 
-// BuildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
-func (h *GenerateHandler) BuildFullPrompt(inputText string) (string, error) {
+// --------------------------------------------------------------------------------
+// ヘルパー関数 (AI/VOICEVOX処理)
+// --------------------------------------------------------------------------------
+
+// buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
+func (h *GenerateHandler) buildFullPrompt(inputText string) (string, error) {
 	promptTemplateString, err := prompt.GetPromptByMode(h.Options.Mode)
 	if err != nil {
 		return "", fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
@@ -208,18 +210,14 @@ func (h *GenerateHandler) BuildFullPrompt(inputText string) (string, error) {
 }
 
 // loadVoicevoxSpeakerData は VOICEVOX スタイルデータをロードします。
-func (h *GenerateHandler) loadVoicevoxSpeakerData(ctx context.Context) (*voicevox.SpeakerData, error) { // 💡 新規抽出
-	client := h.VoicevoxClient
-	if client == nil {
-		return nil, errors.New("内部エラー: VoicevoxClientが初期化されていません")
-	}
-
+func (h *GenerateHandler) loadVoicevoxSpeakerData(ctx context.Context) (*voicevox.SpeakerData, error) {
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-	// HTTPTimeoutではなく、専用の短いタイムアウトを使用
-	loadCtx, cancel := context.WithTimeout(ctx, voicevoxLoadTimeout)
+
+	// HTTPTimeout をロード処理のコンテキストタイムアウトとして使用
+	loadCtx, cancel := context.WithTimeout(ctx, h.Options.HTTPTimeout)
 	defer cancel()
 
-	speakerData, err := voicevox.LoadSpeakers(loadCtx, client)
+	speakerData, err := voicevox.LoadSpeakers(loadCtx, h.VoicevoxClient)
 	if err != nil {
 		return nil, fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 	}
@@ -227,10 +225,14 @@ func (h *GenerateHandler) loadVoicevoxSpeakerData(ctx context.Context) (*voicevo
 	return speakerData, nil
 }
 
-// HandleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
-func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScript string) error {
+// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
+func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error { // 💡 変更: handleVoicevoxOutput
 	if h.Options.VoicevoxOutput == "" {
 		return nil
+	}
+
+	if h.VoicevoxClient == nil {
+		return errors.New("内部エラー: VoicevoxClientが初期化されていません")
 	}
 
 	speakerData, err := h.loadVoicevoxSpeakerData(ctx)
@@ -243,6 +245,8 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 	// パーサーの初期化と Engine への依存性注入
 	parser := voicevox.NewTextParser()
 	engine := voicevox.NewEngine(h.VoicevoxClient, speakerData, parser)
+
+	// Execute処理は時間がかかる可能性があるため、RunGenerateで受け取ったコンテキスト(ctx)を使用
 	err = engine.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
 
 	if err != nil {
@@ -253,18 +257,22 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 	return nil
 }
 
-// HandleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
-func (h *GenerateHandler) HandleFinalOutput(generatedScript string) error {
+// --------------------------------------------------------------------------------
+// ヘルパー関数 (出力処理)
+// --------------------------------------------------------------------------------
+
+// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
+func (h *GenerateHandler) handleFinalOutput(generatedScript string) error {
 	return ioutils.WriteOutput(h.Options.OutputFile, generatedScript)
 }
 
 // generatePostTitle は API 投稿用のタイトルを生成します。
-func (h *GenerateHandler) generatePostTitle(inputContent []byte) string { // 💡 新規抽出
+func (h *GenerateHandler) generatePostTitle(inputContent []byte) string {
 	if h.Options.OutputFile != "" {
-		return h.Options.OutputFile // OutputFileがあればそれをタイトルとして利用
+		// OutputFileオプションを投稿タイトルとして再利用 (cmd/generate.goで定義された機能)
+		return h.Options.OutputFile
 	}
 
-	// 標準入力やファイルからの入力の場合のタイトル生成ロジック
 	const maxLen = 50
 	inputStr := string(inputContent)
 
@@ -273,21 +281,18 @@ func (h *GenerateHandler) generatePostTitle(inputContent []byte) string { // �
 		if len(inputStr) > maxLen {
 			preview = inputStr[:maxLen] + "..."
 		}
-		// ファイル名がない場合は、入力内容のプレビューをタイトルにする
 		return fmt.Sprintf("Generated Script (Stdin/File Preview): %s", preview)
 	}
 
-	// 入力が空の場合
 	return fmt.Sprintf("Generated Script (Empty Input) - Mode: %s", h.Options.Mode)
 }
 
-// HandlePostAPI は生成されたスクリプトを外部APIに投稿します。
-func (h *GenerateHandler) HandlePostAPI(inputContent []byte, generatedScript string) error {
+// handlePostAPI は生成されたスクリプトを外部APIに投稿します。
+func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript string) error {
 	if !h.Options.PostAPI {
 		return nil
 	}
 
-	// 💡 タイトル生成ロジックを分離
 	title := h.generatePostTitle(inputContent)
 
 	fmt.Fprintln(os.Stderr, "外部APIに投稿中...")
