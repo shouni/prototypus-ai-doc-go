@@ -241,7 +241,7 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 
 	loadCtx, cancel := context.WithTimeout(ctx, 10)
 	defer cancel()
-	speakerData, err := voicevox.LoadSpeakers(loadCtx, client, "http://localhost:50021")
+	speakerData, err := voicevox.LoadSpeakers(loadCtx, client)
 	if err != nil {
 		return fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 	}
