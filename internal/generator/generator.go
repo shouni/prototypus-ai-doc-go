@@ -250,8 +250,7 @@ func (h *GenerateHandler) HandleVoicevoxOutput(ctx context.Context, generatedScr
 	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
 
 	// 3. パーサーの初期化と Engine への依存性注入
-	// NOTE: NewTextParser や Engine の依存関係が未提供のため、この行はコンパイルエラーになる可能性がある
-	parser := voicevox.NewTextParser() // script_parser.go で実装されたパーサー
+	parser := voicevox.NewTextParser()
 	engine := voicevox.NewEngine(client, speakerData, parser)
 	err = engine.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
 
