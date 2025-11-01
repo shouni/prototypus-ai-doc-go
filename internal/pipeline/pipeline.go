@@ -104,7 +104,7 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
 func (h *GenerateHandler) readFileContent(filePath string) ([]byte, error) {
 	fmt.Printf("ファイルから読み込み中: %s\n", filePath)
-	return os.ReadFile(filePath)
+	return iohandler.ReadInput(filePath)
 }
 
 // readFromURL はURLからコンテンツを取得します。
