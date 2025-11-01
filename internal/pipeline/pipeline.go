@@ -10,11 +10,11 @@ import (
 	"text/template"
 	"time"
 
-	"prototypus-ai-doc-go/internal/ioutils"
 	"prototypus-ai-doc-go/internal/poster"
 	"prototypus-ai-doc-go/internal/prompt"
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
+	"github.com/shouni/go-utils/iohandler"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
@@ -222,7 +222,6 @@ func (h *GenerateHandler) loadVoicevoxSpeakerData(ctx context.Context) (*voicevo
 		return nil, fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
 	}
 
-	// 💡 修正 L198: 成功した場合にのみ完了メッセージを出力
 	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータのロード完了。")
 	return speakerData, nil
 }
@@ -261,7 +260,7 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 
 // handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
 func (h *GenerateHandler) handleFinalOutput(generatedScript string) error {
-	return ioutils.WriteOutput(h.Options.OutputFile, generatedScript)
+	return iohandler.WriteOutput(h.Options.OutputFile, []byte(generatedScript))
 }
 
 // generatePostTitle は API 投稿用のタイトルを生成します。
