@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -19,13 +20,15 @@ import (
 // グローバルなオプションインスタンス。
 var opts pipeline.GenerateOptions
 
+// defaultHTTPTimeout defines the default timeout for HTTP requests in milliseconds.
 // defaultVoicevoxAPIURL is the default URL for the VOICEVOX API.
 // defaultMaxParallelSegments defines the default max concurrent segments to process.
 // defaultMSegmentTimeout defines the default timeout for processing a single segment in milliseconds.
 const (
+	defaultHttpTimeout         = 30 * time.Second
 	defaultVoicevoxAPIURL      = "http://localhost:50021"
 	defaultMaxParallelSegments = 10
-	defaultMSegmentTimeout     = 180 * time.Second
+	defaultSegmentTimeout      = 180 * time.Second
 )
 
 // defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
@@ -79,7 +82,7 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 	voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
 	if voicevoxAPIURL == "" {
 		voicevoxAPIURL = defaultVoicevoxAPIURL
-		fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
+		log.Printf("警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
 	}
 	// httpTimeout (Web抽出用と同じ) をクライアントに適用
 	voicevoxClient := voicevox.NewClient(voicevoxAPIURL, httpTimeout)
@@ -97,7 +100,7 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 	// 1-3. EngineConfigの設定 (ここではデフォルトを使用。必要に応じてoptsから設定を読み込む)
 	engineConfig := voicevox.EngineConfig{
 		MaxParallelSegments: defaultMaxParallelSegments,
-		SegmentTimeout:      defaultMSegmentTimeout,
+		SegmentTimeout:      defaultSegmentTimeout,
 	}
 
 	// 1-4. Engineの組み立てとExecutorとしての返却
@@ -115,7 +118,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	// opts.HTTPTimeoutがゼロ値の場合、デフォルト値を使用
 	httpTimeout := opts.HTTPTimeout
 	if httpTimeout == 0 {
-		httpTimeout = 30 * time.Second
+		httpTimeout = defaultHttpTimeout
 	}
 
 	// 1. 共通依存関係の初期化 (HTTPクライアント/Extractor)
@@ -132,7 +135,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	}
 
 	// 3. VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "") // ⬅️ 独立した関数を呼び出し
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "")
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
