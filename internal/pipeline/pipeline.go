@@ -118,7 +118,7 @@ func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 	}
 	if !hasBodyFound {
-		slog.Warn("記事本文が見つかりませんでした。タイトルのみで処理を続行します。", "url", h.Options.ScriptURL)
+		slog.Info("記事本文が見つかりませんでした。タイトルのみで処理を続行します。", "url", h.Options.ScriptURL)
 	}
 	return []byte(text), nil
 }

@@ -20,12 +20,12 @@ import (
 // グローバルなオプションインスタンス。
 var opts pipeline.GenerateOptions
 
-// defaultHTTPTimeout defines the default timeout for HTTP requests in milliseconds.
-// defaultVoicevoxAPIURL is the default URL for the VOICEVOX API.
-// defaultMaxParallelSegments defines the default max concurrent segments to process.
-// defaultMSegmentTimeout defines the default timeout for processing a single segment in milliseconds.
+// defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
+// defaultVoicevoxAPIURL はVOICEVOX APIのデフォルトURLです。
+// defaultMaxParallelSegments は並行処理するセグメントのデフォルト最大数を定義します。
+// defaultSegmentTimeout は単一セグメント処理のデフォルトタイムアウトを定義します。
 const (
-	defaultHttpTimeout         = 30 * time.Second
+	defaultHTTPTimeout         = 30 * time.Second
 	defaultVoicevoxAPIURL      = "http://localhost:50021"
 	defaultMaxParallelSegments = 10
 	defaultSegmentTimeout      = 180 * time.Second
@@ -121,7 +121,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	// opts.HTTPTimeoutがゼロ値の場合、デフォルト値を使用
 	httpTimeout := opts.HTTPTimeout
 	if httpTimeout == 0 {
-		httpTimeout = defaultHttpTimeout
+		httpTimeout = defaultHTTPTimeout
 	}
 
 	// 1. 共通依存関係の初期化 (HTTPクライアント/Extractor)
