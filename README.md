@@ -118,7 +118,7 @@ AIモデルの出力形式がプロンプトの指示からわずかに逸脱し
 メインコマンドは `generate` です。
 
 ```bash
-prototypus-ai-doc generate [flags]
+paidgo generate [flags]
 ```
 
 #### フラグ一覧
@@ -145,7 +145,7 @@ VOICEVOXエンジンと環境変数が設定済みであることを前提とし
 
 ```bash
 # Web上の技術記事を読み込み、対話モードでスクリプト生成、VOICEVOXの処理時間を考慮しタイムアウトを延長
-./bin/prototypus-ai-doc generate \
+./bin/paidgo generate \
     --script-url "https://github.com/shouni/prototypus-ai-doc-go" \
     --mode dialogue \
     --http-timeout 280s \
@@ -156,7 +156,7 @@ VOICEVOXエンジンと環境変数が設定済みであることを前提とし
 
 ```bash
 # README.md の内容を元にモノローグスクリプトを生成し、標準出力に表示
-./bin/prototypus-ai-doc generate \
+./bin/paidgo generate \
     --script-file README.md \
     --mode solo \
     --output-file -  # 標準出力への明示的な指定 (省略可能)
@@ -166,7 +166,7 @@ VOICEVOXエンジンと環境変数が設定済みであることを前提とし
 
 ```bash
 # cat コマンドの出力をパイプで渡し、生成したスクリプトを外部APIに POST
-cat my_draft.txt | ./bin/prototypus-ai-doc generate \
+cat my_draft.txt | ./bin/paidgo generate \
     --script-file - \
     --mode duet \
     --post-api
