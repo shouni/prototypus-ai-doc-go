@@ -215,21 +215,15 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 		return nil
 	}
 
-	if h.VoicevoxEngineExecutor == nil {
-		// VoicevoxOutputが指定されているのにExecutorがないのは初期化エラー
-		return errors.New("VOICEVOX Executorが初期化されていません。")
-	}
-
 	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
-
 	// 注入された Executor を直接実行
 	err := h.VoicevoxEngineExecutor.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
 
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 	}
-
 	fmt.Fprintln(os.Stderr, "VOICEVOXによる音声合成が完了し、ファイルに保存されました。")
+
 	return nil
 }
 

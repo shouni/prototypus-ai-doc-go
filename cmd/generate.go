@@ -19,8 +19,14 @@ import (
 // グローバルなオプションインスタンス。
 var opts pipeline.GenerateOptions
 
-// defaultVoicevoxAPIURL は、VOICEVOX APIのデフォルトURLです。
-const defaultVoicevoxAPIURL = "http://localhost:50021"
+// defaultVoicevoxAPIURL is the default URL for the VOICEVOX API.
+// defaultMaxParallelSegments defines the default max concurrent segments to process.
+// defaultMSegmentTimeout defines the default timeout for processing a single segment in milliseconds.
+const (
+	defaultVoicevoxAPIURL      = "http://localhost:50021"
+	defaultMaxParallelSegments = 10
+	defaultMSegmentTimeout     = 180 * time.Second
+)
 
 // defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
 const defaultModel = "gemini-2.5-flash"
@@ -79,8 +85,8 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 	voicevoxClient := voicevox.NewClient(voicevoxAPIURL, httpTimeout)
 
 	// 1-2. SpeakerDataのロード (Engine初期化の必須依存)
-	// ロード処理のタイムアウトを設定 (例: 5秒。個別に調整が必要な場合は定数化)
-	loadCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// ロード処理のタイムアウトを設定 (httpTimeoutを使用)
+	loadCtx, cancel := context.WithTimeout(ctx, httpTimeout)
 	defer cancel()
 
 	speakerData, loadErr := voicevox.LoadSpeakers(loadCtx, voicevoxClient)
@@ -90,8 +96,8 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 
 	// 1-3. EngineConfigの設定 (ここではデフォルトを使用。必要に応じてoptsから設定を読み込む)
 	engineConfig := voicevox.EngineConfig{
-		MaxParallelSegments: 6,
-		SegmentTimeout:      300 * time.Second,
+		MaxParallelSegments: defaultMaxParallelSegments,
+		SegmentTimeout:      defaultMSegmentTimeout,
 	}
 
 	// 1-4. Engineの組み立てとExecutorとしての返却
