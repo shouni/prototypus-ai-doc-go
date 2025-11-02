@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"text/template"
 	"time"
@@ -40,10 +41,10 @@ type GenerateOptions struct {
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateHandler struct {
-	Options        GenerateOptions
-	Extractor      *extract.Extractor
-	AiClient       *gemini.Client
-	VoicevoxClient *voicevox.Client
+	Options                GenerateOptions
+	Extractor              *extract.Extractor
+	AiClient               *gemini.Client
+	VoicevoxEngineExecutor voicevox.EngineExecutor
 }
 
 // --------------------------------------------------------------------------------
@@ -59,8 +60,11 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	}
 
 	// ログ出力
-	fmt.Printf("--- 処理開始 ---\nモード: %s\nモデル: %s\n入力サイズ: %d bytes\n\n", h.Options.Mode, h.Options.AIModel, len(inputContent))
-	fmt.Println("AIによるスクリプト生成を開始します...")
+	slog.Info("処理開始",
+		"mode", h.Options.Mode,
+		"model", h.Options.AIModel,
+		"input_size", len(inputContent))
+	slog.Info("AIによるスクリプト生成を開始します...")
 
 	// 2. プロンプトの構築
 	promptContent, err := h.buildFullPrompt(string(inputContent))
@@ -75,10 +79,11 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	}
 	generatedScript := generatedResponse.Text
 
-	// 生成されたスクリプトを標準エラー出力に進捗メッセージとして表示
 	fmt.Fprintln(os.Stderr, "\n--- AI スクリプト生成結果 ---")
 	fmt.Fprintln(os.Stderr, generatedScript)
 	fmt.Fprintln(os.Stderr, "------------------------------------")
+	// ログには、スクリプトの完了と概要のみを記録する
+	slog.Info("AI スクリプト生成完了", "script_length", len(generatedScript))
 
 	// 4. VOICEVOX出力の処理
 	if err := h.handleVoicevoxOutput(ctx, generatedScript); err != nil {
@@ -103,20 +108,20 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 
 // readFileContent は指定されたファイルパスからコンテンツを読み込みます。
 func (h *GenerateHandler) readFileContent(filePath string) ([]byte, error) {
-	fmt.Printf("ファイルから読み込み中: %s\n", filePath)
+	slog.Info("ファイルから読み込み中", "file", filePath)
 	return iohandler.ReadInput(filePath)
 }
 
 // readFromURL はURLからコンテンツを取得します。
 func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) {
-	fmt.Printf("URLからコンテンツを取得中: %s (タイムアウト: %s)\n", h.Options.ScriptURL, h.Options.HTTPTimeout.String())
+	slog.Info("URLからコンテンツを取得中", "url", h.Options.ScriptURL, "timeout", h.Options.HTTPTimeout.String())
 
 	text, hasBodyFound, err := h.Extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 	}
 	if !hasBodyFound {
-		fmt.Fprintf(os.Stderr, "警告: 記事本文が見つかりませんでした。タイトルのみで処理を続行します。\n")
+		slog.Info("記事本文が見つかりませんでした。タイトルのみで処理を続行します。", "url", h.Options.ScriptURL)
 	}
 	return []byte(text), nil
 }
@@ -124,7 +129,7 @@ func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) {
 // readFromFile はファイルまたは標準入力からコンテンツを読み込みます。
 func (h *GenerateHandler) readFromFile() ([]byte, error) {
 	if h.Options.ScriptFile == "-" {
-		fmt.Println("標準入力 (stdin) から読み込み中...")
+		slog.Info("標準入力 (stdin) から読み込み開始...")
 		content, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			return nil, fmt.Errorf("標準入力の読み込み中に予期せぬエラーが発生しました: %w", err)
@@ -141,7 +146,7 @@ func (h *GenerateHandler) readFromFile() ([]byte, error) {
 
 // readFromStdin は引数なしの標準入力からの読み込みを処理します。
 func (h *GenerateHandler) readFromStdin() ([]byte, error) {
-	fmt.Println("標準入力 (stdin) から読み込み中...")
+	slog.Info("標準入力 (stdin) から読み込み開始...")
 	inputContent, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		if errors.Is(err, io.EOF) && len(inputContent) == 0 {
@@ -209,48 +214,21 @@ func (h *GenerateHandler) buildFullPrompt(inputText string) (string, error) {
 	return fullPrompt.String(), nil
 }
 
-// loadVoicevoxSpeakerData は VOICEVOX スタイルデータをロードします。
-func (h *GenerateHandler) loadVoicevoxSpeakerData(ctx context.Context) (*voicevox.SpeakerData, error) {
-	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-
-	// HTTPTimeout をロード処理のコンテキストタイムアウトとして使用
-	loadCtx, cancel := context.WithTimeout(ctx, h.Options.HTTPTimeout)
-	defer cancel()
-
-	speakerData, err := voicevox.LoadSpeakers(loadCtx, h.VoicevoxClient)
-	if err != nil {
-		return nil, fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
-	}
-
-	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータのロード完了。")
-	return speakerData, nil
-}
-
 // handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
 func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
 	if h.Options.VoicevoxOutput == "" {
 		return nil
 	}
 
-	speakerData, err := h.loadVoicevoxSpeakerData(ctx)
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
-
-	// パーサーの初期化と Engine への依存性注入
-	parser := voicevox.NewTextParser()
-	engine := voicevox.NewEngine(h.VoicevoxClient, speakerData, parser)
-
-	// Execute処理は時間がかかる可能性があるため、RunGenerateで受け取ったコンテキスト(ctx)を使用
-	err = engine.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
+	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", h.Options.VoicevoxOutput)
+	// 注入された Executor を直接実行
+	err := h.VoicevoxEngineExecutor.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
 
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 	}
+	slog.Info("VOICEVOXによる音声合成が完了し、ファイルに保存されました。", "output_file", h.Options.VoicevoxOutput)
 
-	fmt.Fprintln(os.Stderr, "VOICEVOXによる音声合成が完了し、ファイルに保存されました。")
 	return nil
 }
 
@@ -292,12 +270,12 @@ func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript str
 	}
 
 	title := h.generatePostTitle(inputContent)
+	slog.Info("外部APIに投稿中...")
 
-	fmt.Fprintln(os.Stderr, "外部APIに投稿中...")
 	if err := poster.PostToAPI(title, h.Options.Mode, generatedScript); err != nil {
-		fmt.Fprintf(os.Stderr, "警告: 外部APIへの投稿に失敗しました: %v\n", err)
+		slog.Warn("外部APIへの投稿に失敗しました。", "error", err)
 	} else {
-		fmt.Fprintln(os.Stderr, "外部APIへの投稿が完了しました。")
+		slog.Info("外部APIへの投稿が完了しました。")
 	}
 
 	return nil

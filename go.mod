@@ -7,8 +7,8 @@ require (
 	github.com/shouni/go-cli-base v1.0.4
 	github.com/shouni/go-http-kit v1.0.2
 	github.com/shouni/go-utils v1.0.6
-	github.com/shouni/go-voicevox v1.0.3
-	github.com/shouni/go-web-exact/v2 v2.0.3
+	github.com/shouni/go-voicevox v1.0.4
+	github.com/shouni/go-web-exact/v2 v2.0.4
 	github.com/spf13/cobra v1.10.1
 )
 
@@ -20,6 +20,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/forPelevin/gomoji v1.4.1 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -28,6 +29,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
