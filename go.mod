@@ -8,7 +8,7 @@ require (
 	github.com/shouni/go-http-kit v1.0.2
 	github.com/shouni/go-utils v1.0.6
 	github.com/shouni/go-voicevox v1.0.4
-	github.com/shouni/go-web-exact/v2 v2.0.4
+	github.com/shouni/go-web-exact/v2 v2.0.5
 	github.com/spf13/cobra v1.10.1
 )
 
