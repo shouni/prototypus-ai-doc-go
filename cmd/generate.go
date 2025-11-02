@@ -27,8 +27,8 @@ var opts pipeline.GenerateOptions
 const (
 	defaultHTTPTimeout         = 30 * time.Second
 	defaultVoicevoxAPIURL      = "http://localhost:50021"
-	defaultMaxParallelSegments = 10
-	defaultSegmentTimeout      = 180 * time.Second
+	defaultMaxParallelSegments = 8
+	defaultSegmentTimeout      = 240 * time.Second
 )
 
 // defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
