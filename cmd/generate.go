@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -82,10 +82,12 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 	voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
 	if voicevoxAPIURL == "" {
 		voicevoxAPIURL = defaultVoicevoxAPIURL
-		log.Printf("警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
+		slog.Warn("VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値を使用します。", "default_url", voicevoxAPIURL)
 	}
 	// httpTimeout (Web抽出用と同じ) をクライアントに適用
 	voicevoxClient := voicevox.NewClient(voicevoxAPIURL, httpTimeout)
+
+	slog.Info("VOICEVOXスタイルデータをロード中...")
 
 	// 1-2. SpeakerDataのロード (Engine初期化の必須依存)
 	// ロード処理のタイムアウトを設定 (httpTimeoutを使用)
@@ -96,6 +98,7 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 	if loadErr != nil {
 		return nil, fmt.Errorf("VOICEVOXエンジンへの接続または話者データのロードに失敗しました: %w", loadErr)
 	}
+	slog.Info("VOICEVOXスタイルデータのロード完了。")
 
 	// 1-3. EngineConfigの設定 (ここではデフォルトを使用。必要に応じてoptsから設定を読み込む)
 	engineConfig := voicevox.EngineConfig{
