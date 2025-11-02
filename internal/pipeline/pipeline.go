@@ -40,10 +40,10 @@ type GenerateOptions struct {
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateHandler struct {
-	Options        GenerateOptions
-	Extractor      *extract.Extractor
-	AiClient       *gemini.Client
-	VoicevoxClient *voicevox.Client
+	Options                GenerateOptions
+	Extractor              *extract.Extractor
+	AiClient               *gemini.Client
+	VoicevoxEngineExecutor voicevox.EngineExecutor
 }
 
 // --------------------------------------------------------------------------------
@@ -209,42 +209,21 @@ func (h *GenerateHandler) buildFullPrompt(inputText string) (string, error) {
 	return fullPrompt.String(), nil
 }
 
-// loadVoicevoxSpeakerData は VOICEVOX スタイルデータをロードします。
-func (h *GenerateHandler) loadVoicevoxSpeakerData(ctx context.Context) (*voicevox.SpeakerData, error) {
-	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータをロード中...")
-
-	// HTTPTimeout をロード処理のコンテキストタイムアウトとして使用
-	loadCtx, cancel := context.WithTimeout(ctx, h.Options.HTTPTimeout)
-	defer cancel()
-
-	speakerData, err := voicevox.LoadSpeakers(loadCtx, h.VoicevoxClient)
-	if err != nil {
-		return nil, fmt.Errorf("VOICEVOXスタイルデータのロードに失敗しました: %w", err)
-	}
-
-	fmt.Fprintln(os.Stderr, "VOICEVOXスタイルデータのロード完了。")
-	return speakerData, nil
-}
-
 // handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
 func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
 	if h.Options.VoicevoxOutput == "" {
 		return nil
 	}
 
-	speakerData, err := h.loadVoicevoxSpeakerData(ctx)
-	if err != nil {
-		return err
+	if h.VoicevoxEngineExecutor == nil {
+		// VoicevoxOutputが指定されているのにExecutorがないのは初期化エラー
+		return errors.New("VOICEVOX Executorが初期化されていません。")
 	}
 
 	fmt.Fprintf(os.Stderr, "VOICEVOXエンジンに接続し、音声合成を開始します (出力: %s)...\n", h.Options.VoicevoxOutput)
 
-	// パーサーの初期化と Engine への依存性注入
-	parser := voicevox.NewTextParser()
-	engine := voicevox.NewEngine(h.VoicevoxClient, speakerData, parser)
-
-	// Execute処理は時間がかかる可能性があるため、RunGenerateで受け取ったコンテキスト(ctx)を使用
-	err = engine.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
+	// 注入された Executor を直接実行
+	err := h.VoicevoxEngineExecutor.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
 
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)

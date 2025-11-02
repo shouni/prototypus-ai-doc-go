@@ -63,6 +63,45 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	return aiClient, nil
 }
 
+// initializeVoicevoxExecutor は VOICEVOX クライアント、話者データ、および実行エンジンを初期化します。
+func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, voicevoxOutput bool) (voicevox.EngineExecutor, error) {
+	if !voicevoxOutput {
+		return nil, nil // VOICEVOX機能を使用しない場合はnilを返す
+	}
+
+	// 1-1. クライアントの初期化
+	voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
+	if voicevoxAPIURL == "" {
+		voicevoxAPIURL = defaultVoicevoxAPIURL
+		fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
+	}
+	// httpTimeout (Web抽出用と同じ) をクライアントに適用
+	voicevoxClient := voicevox.NewClient(voicevoxAPIURL, httpTimeout)
+
+	// 1-2. SpeakerDataのロード (Engine初期化の必須依存)
+	// ロード処理のタイムアウトを設定 (例: 5秒。個別に調整が必要な場合は定数化)
+	loadCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	speakerData, loadErr := voicevox.LoadSpeakers(loadCtx, voicevoxClient)
+	if loadErr != nil {
+		return nil, fmt.Errorf("VOICEVOXエンジンへの接続または話者データのロードに失敗しました: %w", loadErr)
+	}
+
+	// 1-3. EngineConfigの設定 (ここではデフォルトを使用。必要に応じてoptsから設定を読み込む)
+	engineConfig := voicevox.EngineConfig{
+		MaxParallelSegments: 6,
+		SegmentTimeout:      300 * time.Second,
+	}
+
+	// 1-4. Engineの組み立てとExecutorとしての返却
+	parser := voicevox.NewTextParser()
+	// voicevox.NewEngine は voicevox.EngineExecutor インターフェースを満たす具象型を返す
+	voicevoxExecutor := voicevox.NewEngine(voicevoxClient, speakerData, parser, engineConfig)
+
+	return voicevoxExecutor, nil
+}
+
 // setupDependencies は、RunEの実行に必要な全ての依存関係（クライアント、エクストラクタなど）を初期化し、
 // RunGenerateを実行するためのHandlerを返します。
 func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
@@ -86,23 +125,18 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 		return pipeline.GenerateHandler{}, err
 	}
 
-	// 3. VOICEVOX Clientの初期化
-	var voicevoxClient *voicevox.Client
-	if opts.VoicevoxOutput != "" {
-		voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
-		if voicevoxAPIURL == "" {
-			voicevoxAPIURL = defaultVoicevoxAPIURL
-			fmt.Fprintf(os.Stderr, "警告: VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値 (%s) を使用します。\n", voicevoxAPIURL)
-		}
-		voicevoxClient = voicevox.NewClient(voicevoxAPIURL, httpTimeout)
+	// 3. VOICEVOX エンジンパイプラインの初期化
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "") // ⬅️ 独立した関数を呼び出し
+	if err != nil {
+		return pipeline.GenerateHandler{}, err
 	}
 
-	// 3. Handlerに依存関係を注入
+	// 4. Handlerに依存関係を注入
 	handler := pipeline.GenerateHandler{
-		Options:        opts,
-		Extractor:      extractor,
-		AiClient:       aiClient,
-		VoicevoxClient: voicevoxClient,
+		Options:                opts,
+		Extractor:              extractor,
+		AiClient:               aiClient,
+		VoicevoxEngineExecutor: voicevoxExecutor,
 	}
 
 	return handler, nil
