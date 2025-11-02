@@ -79,8 +79,11 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	}
 	generatedScript := generatedResponse.Text
 
-	// 生成されたスクリプトを標準エラー出力に進捗メッセージとして表示
-	slog.Info("AI スクリプト生成完了", "script", generatedScript)
+	fmt.Fprintln(os.Stderr, "\n--- AI スクリプト生成結果 ---")
+	fmt.Fprintln(os.Stderr, generatedScript)
+	fmt.Fprintln(os.Stderr, "------------------------------------")
+	// ログには、スクリプトの完了と概要のみを記録する
+	slog.Info("AI スクリプト生成完了", "script_length", len(generatedScript))
 
 	// 4. VOICEVOX出力の処理
 	if err := h.handleVoicevoxOutput(ctx, generatedScript); err != nil {
