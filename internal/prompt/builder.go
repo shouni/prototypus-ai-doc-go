@@ -17,7 +17,6 @@ var ZundamonSoloPrompt string
 var ZundaMetanDuetPrompt string
 
 // TemplateData はプロンプトテンプレートに渡すデータ構造です。
-// テンプレートとの一貫性を保つため InputText を使用
 type TemplateData struct {
 	InputText string
 }
@@ -27,32 +26,33 @@ type TemplateData struct {
 // ----------------------------------------------------------------
 
 // Builder はプロンプトの構成とテンプレート実行を管理します。
+// 修正: NewBuilder がエラーを返すようになったため、err フィールドを削除
 type Builder struct {
 	tmpl *template.Template
-	err  error // テンプレートのパースエラーを保持
 }
 
 // NewBuilder は Builder を初期化します。
-// templateStr: 実行に使用するテンプレート文字列。
-func NewBuilder(templateStr string) *Builder {
+// 修正: Goの慣習に従い、エラーを直接返すようにシグネチャを変更
+func NewBuilder(templateStr string) (*Builder, error) {
 	// テンプレート名は一意であれば何でも良い
 	tmpl, err := template.New("prompt_template").Parse(templateStr)
-	return &Builder{tmpl: tmpl, err: err}
+	if err != nil {
+		// エラーをラップして、呼び出し元に即座に返却
+		return nil, fmt.Errorf("プロンプトテンプレートの解析に失敗しました: %w", err)
+	}
+	// テンプレートのパースが成功した場合のみ Builder を返す
+	return &Builder{tmpl: tmpl}, nil
 }
 
 // buildPrompt は検証済みのデータを使用してプロンプトを生成します。
-// データ検証を Build メソッドに移し、buildPrompt は実行に専念させます。
-func (b *Builder) buildPrompt(data interface{}) (string, error) {
-	// 1. テンプレート初期化時のエラーをチェック
-	if b.err != nil {
-		// 元のエラーをラップして返却
-		return "", fmt.Errorf("プロンプトテンプレートの初期化に失敗しています: %w", b.err)
-	}
+// 修正: 引数を TemplateData に変更し、型安全性を向上
+func (b *Builder) buildPrompt(data TemplateData) (string, error) {
+	// 修正: NewBuilder でエラーチェックが完了しているため、b.err のチェックは不要
 
-	// 2. テンプレート実行 (strings.Builderを使用)
 	var sb strings.Builder
 	if err := b.tmpl.Execute(&sb, data); err != nil {
 		// エラーにテンプレート名を含めて返却
+		// b.tmpl は NewBuilder が成功した時点で有効なので、安全にアクセス可能
 		return "", fmt.Errorf("%sプロンプトの実行に失敗しました: %w", b.tmpl.Name(), err)
 	}
 
@@ -63,12 +63,11 @@ func (b *Builder) buildPrompt(data interface{}) (string, error) {
 func (b *Builder) Build(data TemplateData) (string, error) {
 	// 1. データ検証を Build メソッド内で直接行う
 	if strings.TrimSpace(data.InputText) == "" {
-		// エラーを返す
-		return "", fmt.Errorf("プロンプト実行失敗: TemplateData.InputTextが空または空白のみです")
+		// 修正: エラーメッセージにテンプレート名を含めることで、デバッグ時の情報量を増やす
+		return "", fmt.Errorf("%sプロンプト実行失敗: TemplateData.InputTextが空または空白のみです", b.tmpl.Name())
 	}
 
 	// 2. 検証済みのデータで buildPrompt を実行
-	// buildPrompt は引数を一つに削減されたため、呼び出しも簡潔に
 	return b.buildPrompt(data)
 }
 
