@@ -26,13 +26,11 @@ type TemplateData struct {
 // ----------------------------------------------------------------
 
 // Builder はプロンプトの構成とテンプレート実行を管理します。
-// 修正: NewBuilder がエラーを返すようになったため、err フィールドを削除
 type Builder struct {
 	tmpl *template.Template
 }
 
 // NewBuilder は Builder を初期化します。
-// 修正: Goの慣習に従い、エラーを直接返すようにシグネチャを変更
 func NewBuilder(templateStr string) (*Builder, error) {
 	// テンプレート名は一意であれば何でも良い
 	tmpl, err := template.New("prompt_template").Parse(templateStr)
@@ -45,7 +43,6 @@ func NewBuilder(templateStr string) (*Builder, error) {
 }
 
 // buildPrompt は検証済みのデータを使用してプロンプトを生成します。
-// 修正: 引数を TemplateData に変更し、型安全性を向上
 func (b *Builder) buildPrompt(data TemplateData) (string, error) {
 	// 修正: NewBuilder でエラーチェックが完了しているため、b.err のチェックは不要
 
@@ -63,7 +60,7 @@ func (b *Builder) buildPrompt(data TemplateData) (string, error) {
 func (b *Builder) Build(data TemplateData) (string, error) {
 	// 1. データ検証を Build メソッド内で直接行う
 	if strings.TrimSpace(data.InputText) == "" {
-		// 修正: エラーメッセージにテンプレート名を含めることで、デバッグ時の情報量を増やす
+		// エラーメッセージにテンプレート名を含めることで、デバッグ時の情報量を増やす
 		return "", fmt.Errorf("%sプロンプト実行失敗: TemplateData.InputTextが空または空白のみです", b.tmpl.Name())
 	}
 
