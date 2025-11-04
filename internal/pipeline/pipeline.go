@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
+	"strings"
 	"time"
 
 	"prototypus-ai-doc-go/internal/poster"
@@ -21,7 +21,16 @@ import (
 const MinInputContentLength = 10
 
 // --------------------------------------------------------------------------------
-// 構造体定義 (変更なし)
+// インターフェース定義 (リファクタリングのため追加)
+// --------------------------------------------------------------------------------
+
+// PromptBuilder は prompt.Builder の Build メソッドをラップするインターフェース
+type PromptBuilder interface {
+	Build(data prompt.TemplateData) (string, error)
+}
+
+// --------------------------------------------------------------------------------
+// 構造体定義
 // --------------------------------------------------------------------------------
 
 // GenerateOptions はコマンドラインフラグを保持する構造体です。
@@ -40,9 +49,9 @@ type GenerateOptions struct {
 type GenerateHandler struct {
 	Options                GenerateOptions
 	Extractor              *extract.Extractor
-	PromptBuilder          *prompt.Builder
+	PromptBuilder          PromptBuilder
 	AiClient               *gemini.Client
-	VoicevoxEngineExecutor voicevox.EngineExecutor
+	VoicevoxEngineExecutor voicevox.EngineExecutor // voicevox.Executor へのリネームを仮定しなかった場合
 }
 
 // --------------------------------------------------------------------------------
@@ -71,24 +80,22 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	}
 
 	// 3. AIによるスクリプト生成
+	// リトライ処理などは AiClient 内部に依存
 	generatedResponse, err := h.AiClient.GenerateContent(ctx, promptContent, h.Options.AIModel)
 	if err != nil {
 		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
 	generatedScript := generatedResponse.Text
 
-	fmt.Fprintln(os.Stderr, "\n--- AI スクリプト生成結果 ---")
-	fmt.Fprintln(os.Stderr, generatedScript)
-	fmt.Fprintln(os.Stderr, "------------------------------------")
-	// ログには、スクリプトの完了と概要のみを記録する
 	slog.Info("AI スクリプト生成完了", "script_length", len(generatedScript))
 
 	// 4. VOICEVOX出力の処理
-	if err := h.handleVoicevoxOutput(ctx, generatedScript); err != nil {
-		return err
-	}
 	if h.Options.VoicevoxOutput != "" {
-		return nil // VOICEVOX出力が成功した場合、ここで処理を終了
+		if err := h.handleVoicevoxOutput(ctx, generatedScript); err != nil {
+			return err
+		}
+		// VOICEVOX出力が成功した場合、ここで処理を終了 (早期リターン)
+		return nil
 	}
 
 	// 5. 通常のI/O出力
@@ -104,12 +111,6 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 // ヘルパー関数 (入力処理)
 // --------------------------------------------------------------------------------
 
-// readFileContent は指定されたファイルパスからコンテンツを読み込みます。
-func (h *GenerateHandler) readFileContent(filePath string) ([]byte, error) {
-	slog.Info("ファイルから読み込み中", "file", filePath)
-	return iohandler.ReadInput(filePath)
-}
-
 // readFromURL はURLからコンテンツを取得します。
 func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) {
 	slog.Info("URLからコンテンツを取得中", "url", h.Options.ScriptURL, "timeout", h.Options.HTTPTimeout.String())
@@ -124,40 +125,9 @@ func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) {
 	return []byte(text), nil
 }
 
-// readFromFile はファイルまたは標準入力からコンテンツを読み込みます。
-func (h *GenerateHandler) readFromFile() ([]byte, error) {
-	if h.Options.ScriptFile == "-" {
-		slog.Info("標準入力 (stdin) から読み込み開始...")
-		content, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			return nil, fmt.Errorf("標準入力の読み込み中に予期せぬエラーが発生しました: %w", err)
-		}
-		return content, nil
-	}
-
-	content, err := h.readFileContent(h.Options.ScriptFile)
-	if err != nil {
-		return nil, fmt.Errorf("スクリプトファイル '%s' の読み込みに失敗しました: %w", h.Options.ScriptFile, err)
-	}
-	return content, nil
-}
-
-// readFromStdin は引数なしの標準入力からの読み込みを処理します。
-func (h *GenerateHandler) readFromStdin() ([]byte, error) {
-	slog.Info("標準入力 (stdin) から読み込み開始...")
-	inputContent, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		if errors.Is(err, io.EOF) && len(inputContent) == 0 {
-			return nil, fmt.Errorf("標準入力が空です。文章を入力してください。")
-		}
-		return nil, fmt.Errorf("標準入力の読み込み中に予期せぬエラーが発生しました: %w", err)
-	}
-	return inputContent, nil
-}
-
 // readInputContent は入力ソースからコンテンツを読み込みます。
 func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) {
-	// 早期リターン条件チェック
+	// 早期リターン条件チェックの強化: VOICEVOX出力時はOutputFileは不要
 	if h.Options.VoicevoxOutput != "" && h.Options.OutputFile != "" {
 		return nil, fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
 	}
@@ -169,20 +139,29 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 	case h.Options.ScriptURL != "":
 		inputContent, err = h.readFromURL(ctx)
 	case h.Options.ScriptFile != "":
-		inputContent, err = h.readFromFile()
+		// 修正: iohandler.ReadInput を活用し、ファイル名または "-" (stdin) を渡す
+		inputContent, err = iohandler.ReadInput(h.Options.ScriptFile)
 	default:
-		inputContent, err = h.readFromStdin()
+		// 修正: iohandler.ReadInput を活用し、ファイル名なし (= stdin) を渡す
+		inputContent, err = iohandler.ReadInput("")
 	}
 
 	if err != nil {
+		// iohandler からの標準入力 EOF エラーをより親切なメッセージに変換
+		if errors.Is(err, io.EOF) && len(inputContent) == 0 && h.Options.ScriptFile == "" {
+			return nil, fmt.Errorf("標準入力が空です。文章を入力してください。")
+		}
 		return nil, err
 	}
 
-	if len(inputContent) < MinInputContentLength {
+	// リファクタリング: 文字列化してTrimSpaceしてから len をチェック
+	trimmedContent := strings.TrimSpace(string(inputContent))
+	if len(trimmedContent) < MinInputContentLength {
 		return nil, fmt.Errorf("入力されたコンテンツが短すぎます (最低%dバイト必要です)。", MinInputContentLength)
 	}
 
-	return inputContent, nil
+	// TrimSpace後のバイト配列を返す
+	return []byte(trimmedContent), nil
 }
 
 // --------------------------------------------------------------------------------
@@ -191,10 +170,11 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 
 // buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
 func (h *GenerateHandler) buildFullPrompt(inputText string) (string, error) {
+	// リファクタリング: InputText のTrimSpaceは readInputContent で行ったため、ここでは行わない
 	data := prompt.TemplateData{InputText: inputText}
 	fullPromptString, err := h.PromptBuilder.Build(data)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("プロンプトの構築に失敗しました: %w", err)
 	}
 
 	return fullPromptString, nil
@@ -202,11 +182,8 @@ func (h *GenerateHandler) buildFullPrompt(inputText string) (string, error) {
 
 // handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
 func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
-	if h.Options.VoicevoxOutput == "" {
-		return nil
-	}
-
 	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", h.Options.VoicevoxOutput)
+
 	// 注入された Executor を直接実行
 	err := h.VoicevoxEngineExecutor.Execute(ctx, generatedScript, h.Options.VoicevoxOutput)
 
@@ -224,13 +201,13 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 
 // handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
 func (h *GenerateHandler) handleFinalOutput(generatedScript string) error {
-	return iohandler.WriteOutput(h.Options.OutputFile, []byte(generatedScript))
+	return iohandler.WriteOutputString(h.Options.OutputFile, generatedScript)
 }
 
 // generatePostTitle は API 投稿用のタイトルを生成します。
+// (ロジックの変更なし - そのまま維持)
 func (h *GenerateHandler) generatePostTitle(inputContent []byte) string {
 	if h.Options.OutputFile != "" {
-		// OutputFileオプションを投稿タイトルとして再利用 (cmd/generate.goで定義された機能)
 		return h.Options.OutputFile
 	}
 
@@ -250,6 +227,7 @@ func (h *GenerateHandler) generatePostTitle(inputContent []byte) string {
 }
 
 // handlePostAPI は生成されたスクリプトを外部APIに投稿します。
+// (ロジックの変更なし - そのまま維持)
 func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript string) error {
 	if !h.Options.PostAPI {
 		return nil
