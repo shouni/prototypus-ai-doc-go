@@ -4,10 +4,10 @@ go 1.25.0
 
 require (
 	github.com/shouni/go-ai-client/v2 v2.0.2
-	github.com/shouni/go-cli-base v1.0.4
-	github.com/shouni/go-http-kit v1.0.3
+	github.com/shouni/go-cli-base v1.0.5
+	github.com/shouni/go-http-kit v1.0.4
 	github.com/shouni/go-utils v1.0.6
-	github.com/shouni/go-voicevox v1.0.7
+	github.com/shouni/go-voicevox v1.0.9
 	github.com/shouni/go-web-exact/v2 v2.0.5
 	github.com/spf13/cobra v1.10.1
 )

@@ -28,15 +28,14 @@ const MinInputContentLength = 10
 
 // GenerateOptions はコマンドラインフラグを保持する構造体です。
 type GenerateOptions struct {
-	OutputFile          string
-	Mode                string
-	PostAPI             bool
-	VoicevoxOutput      string
-	ScriptURL           string
-	ScriptFile          string
-	AIModel             string
-	HTTPTimeout         time.Duration
-	VoicevoxFallbackTag string
+	OutputFile     string
+	Mode           string
+	PostAPI        bool
+	VoicevoxOutput string
+	ScriptURL      string
+	ScriptFile     string
+	AIModel        string
+	HTTPTimeout    time.Duration
 }
 
 // GenerateHandler は generate コマンドの実行に必要な依存とオプションを保持します。
@@ -222,7 +221,7 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 
 	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", h.Options.VoicevoxOutput)
 	// 注入された Executor を直接実行
-	err := h.VoicevoxEngineExecutor.Execute(ctx, generatedScript, h.Options.VoicevoxOutput, h.Options.VoicevoxFallbackTag)
+	err := h.VoicevoxEngineExecutor.Execute(ctx, generatedScript, h.Options.VoicevoxOutput)
 
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
