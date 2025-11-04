@@ -17,7 +17,7 @@ var ZundamonSoloPrompt string
 var ZundaMetanDuetPrompt string
 
 // TemplateData はプロンプトテンプレートに渡すデータ構造です。
-// 修正: フィールド名を Text から InputText に変更し、テンプレートファイルと一致させる
+// テンプレートとの一貫性を保つため InputText を使用
 type TemplateData struct {
 	InputText string
 }
@@ -40,23 +40,19 @@ func NewBuilder(templateStr string) *Builder {
 	return &Builder{tmpl: tmpl, err: err}
 }
 
-// buildPrompt はテンプレートデータを検証し、プロンプトを生成します。
-func (b *Builder) buildPrompt(data interface{}, emptyCheckFunc func(data interface{}) error) (string, error) {
+// buildPrompt は検証済みのデータを使用してプロンプトを生成します。
+// データ検証を Build メソッドに移し、buildPrompt は実行に専念させます。
+func (b *Builder) buildPrompt(data interface{}) (string, error) {
 	// 1. テンプレート初期化時のエラーをチェック
 	if b.err != nil {
-		// b.tmpl.Name() が使えない可能性があるため、固定メッセージでエラーを出力
+		// 元のエラーをラップして返却
 		return "", fmt.Errorf("プロンプトテンプレートの初期化に失敗しています: %w", b.err)
 	}
 
-	// 2. データ固有の空チェックを実行
-	if err := emptyCheckFunc(data); err != nil {
-		// emptyCheckFuncが具体的なフィールド名を含むエラーを返すため、それをそのまま利用
-		return "", fmt.Errorf("プロンプト実行失敗: %w", err)
-	}
-
-	// 3. テンプレート実行 (strings.Builderを使用)
+	// 2. テンプレート実行 (strings.Builderを使用)
 	var sb strings.Builder
 	if err := b.tmpl.Execute(&sb, data); err != nil {
+		// エラーにテンプレート名を含めて返却
 		return "", fmt.Errorf("%sプロンプトの実行に失敗しました: %w", b.tmpl.Name(), err)
 	}
 
@@ -65,13 +61,15 @@ func (b *Builder) buildPrompt(data interface{}, emptyCheckFunc func(data interfa
 
 // Build は TemplateData を埋め込み、プロンプト文字列を完成させます。
 func (b *Builder) Build(data TemplateData) (string, error) {
-	return b.buildPrompt(data, func(d interface{}) error {
-		if strings.TrimSpace(d.(TemplateData).InputText) == "" {
-			// エラーメッセージも新しいフィールド名に合わせて修正
-			return fmt.Errorf("TemplateData.InputTextが空または空白のみです")
-		}
-		return nil
-	})
+	// 1. データ検証を Build メソッド内で直接行う
+	if strings.TrimSpace(data.InputText) == "" {
+		// エラーを返す
+		return "", fmt.Errorf("プロンプト実行失敗: TemplateData.InputTextが空または空白のみです")
+	}
+
+	// 2. 検証済みのデータで buildPrompt を実行
+	// buildPrompt は引数を一つに削減されたため、呼び出しも簡潔に
+	return b.buildPrompt(data)
 }
 
 // GetPromptByMode は、指定されたモードに対応するプロンプト文字列を返します。

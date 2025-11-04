@@ -194,7 +194,7 @@ func (h *GenerateHandler) buildFullPrompt(inputText string) (string, error) {
 	data := prompt.TemplateData{InputText: inputText}
 	fullPromptString, err := h.PromptBuilder.Build(data)
 	if err != nil {
-		return "", fmt.Errorf("プロンプトの生成に失敗しました: %w", err)
+		return "", err
 	}
 
 	return fullPromptString, nil
