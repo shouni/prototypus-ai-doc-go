@@ -36,7 +36,7 @@ func NewBuilder(templateStr string) (*Builder, error) {
 	tmpl, err := template.New("prompt_template").Parse(templateStr)
 	if err != nil {
 		// エラーをラップして、呼び出し元に即座に返却
-		return nil, fmt.Errorf("プロンプトテンプレートの解析に失敗しました: %w", err)
+		return nil, fmt.Errorf("プロンプトテンプレートの解析に失敗しました (テンプレート先頭: %.50s...): %w", templateStr, err)
 	}
 	// テンプレートのパースが成功した場合のみ Builder を返す
 	return &Builder{tmpl: tmpl}, nil
