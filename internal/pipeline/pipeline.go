@@ -1,14 +1,12 @@
 package pipeline
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
-	"text/template"
 	"time"
 
 	"prototypus-ai-doc-go/internal/poster"
@@ -42,6 +40,7 @@ type GenerateOptions struct {
 type GenerateHandler struct {
 	Options                GenerateOptions
 	Extractor              *extract.Extractor
+	PromptBuilder          *prompt.Builder
 	AiClient               *gemini.Client
 	VoicevoxEngineExecutor voicevox.EngineExecutor
 }
@@ -192,25 +191,13 @@ func (h *GenerateHandler) readInputContent(ctx context.Context) ([]byte, error) 
 
 // buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
 func (h *GenerateHandler) buildFullPrompt(inputText string) (string, error) {
-	promptTemplateString, err := prompt.GetPromptByMode(h.Options.Mode)
+	data := prompt.TemplateData{InputText: inputText}
+	fullPromptString, err := h.PromptBuilder.Build(data)
 	if err != nil {
-		return "", fmt.Errorf("プロンプトテンプレートの取得に失敗しました: %w", err)
+		return "", err
 	}
 
-	type InputData struct{ InputText string }
-	data := InputData{InputText: inputText}
-
-	tmpl, err := template.New("prompt").Parse(promptTemplateString)
-	if err != nil {
-		return "", fmt.Errorf("プロンプトテンプレートの解析エラー: %w", err)
-	}
-
-	var fullPrompt bytes.Buffer
-	if err := tmpl.Execute(&fullPrompt, data); err != nil {
-		return "", fmt.Errorf("プロンプトへの入力埋め込みエラー: %w", err)
-	}
-
-	return fullPrompt.String(), nil
+	return fullPromptString, nil
 }
 
 // handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
