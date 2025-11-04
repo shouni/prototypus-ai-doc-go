@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"prototypus-ai-doc-go/internal/pipeline"
+	"prototypus-ai-doc-go/internal/prompt"
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
@@ -131,22 +132,30 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 		return pipeline.GenerateHandler{}, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
 
-	// 2. AIクライアントの初期化
+	// 2. promptBuilderの初期化
+	templateStr, err := prompt.GetPromptByMode(opts.Mode)
+	if err != nil {
+		return pipeline.GenerateHandler{}, err
+	}
+	promptBuilder := prompt.NewBuilder(templateStr)
+
+	// 3. AIクライアントの初期化
 	aiClient, err := initializeAIClient(ctx)
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
 
-	// 3. VOICEVOX エンジンパイプラインの初期化
+	// 4. VOICEVOX エンジンパイプラインの初期化
 	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "")
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
 
-	// 4. Handlerに依存関係を注入
+	// 5. Handlerに依存関係を注入
 	handler := pipeline.GenerateHandler{
 		Options:                opts,
 		Extractor:              extractor,
+		PromptBuilder:          promptBuilder,
 		AiClient:               aiClient,
 		VoicevoxEngineExecutor: voicevoxExecutor,
 	}
