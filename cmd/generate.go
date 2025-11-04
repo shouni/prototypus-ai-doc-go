@@ -23,13 +23,10 @@ var opts pipeline.GenerateOptions
 
 // defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
 // defaultVoicevoxAPIURL はVOICEVOX APIのデフォルトURLです。
-// defaultMaxParallelSegments は並行処理するセグメントのデフォルト最大数を定義します。
-// defaultSegmentTimeout は単一セグメント処理のデフォルトタイムアウトを定義します。
+// NOTE: voicevox.DefaultMaxParallelSegments, voicevox.DefaultSegmentTimeout はvoicevoxパッケージから直接参照
 const (
-	defaultHTTPTimeout         = 30 * time.Second
-	defaultVoicevoxAPIURL      = "http://localhost:50021"
-	defaultMaxParallelSegments = voicevox.DefaultMaxParallelSegments
-	defaultSegmentTimeout      = voicevox.DefaultSegmentTimeout
+	defaultHTTPTimeout    = 30 * time.Second
+	defaultVoicevoxAPIURL = "http://localhost:50021"
 )
 
 // defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
@@ -101,10 +98,10 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 	}
 	slog.Info("VOICEVOXスタイルデータのロード完了。")
 
-	// 1-3. EngineConfigの設定 (ここではデフォルトを使用。必要に応じてoptsから設定を読み込む)
+	// 1-3. EngineConfigの設定
 	engineConfig := voicevox.EngineConfig{
-		MaxParallelSegments: defaultMaxParallelSegments,
-		SegmentTimeout:      defaultSegmentTimeout,
+		MaxParallelSegments: voicevox.DefaultMaxParallelSegments,
+		SegmentTimeout:      voicevox.DefaultSegmentTimeout,
 	}
 
 	// 1-4. Engineの組み立てとExecutorとしての返却
@@ -119,7 +116,6 @@ func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, 
 // RunGenerateを実行するためのHandlerを返します。
 func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	// --- タイムアウト値の調整 ---
-	// opts.HTTPTimeoutがゼロ値の場合、デフォルト値を使用
 	httpTimeout := opts.HTTPTimeout
 	if httpTimeout == 0 {
 		httpTimeout = defaultHTTPTimeout
@@ -135,10 +131,11 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	// 2. promptBuilderの初期化
 	templateStr, err := prompt.GetPromptByMode(opts.Mode)
 	if err != nil {
-		return pipeline.GenerateHandler{}, err
+		return pipeline.GenerateHandler{}, err // モードが無効な場合のエラー
 	}
 	promptBuilder, err := prompt.NewBuilder(templateStr)
 	if err != nil {
+		// NewBuilderが解析エラーを返した場合は、それをラップして返却
 		return pipeline.GenerateHandler{}, fmt.Errorf("プロンプトビルダーの作成に失敗しました: %w", err)
 	}
 
@@ -155,6 +152,8 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	}
 
 	// 5. Handlerに依存関係を注入
+	// pipeline.GenerateHandler のフィールドがインターフェース型であっても、
+	// ここで渡しているのは具象型(*prompt.Builder, *voicevox.Engine)なので問題なく代入される
 	handler := pipeline.GenerateHandler{
 		Options:                opts,
 		Extractor:              extractor,
