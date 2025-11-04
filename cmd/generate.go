@@ -137,7 +137,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
-	promptBuilder, nil := prompt.NewBuilder(templateStr)
+	promptBuilder, err := prompt.NewBuilder(templateStr)
 	if err != nil {
 		return pipeline.GenerateHandler{}, fmt.Errorf("failed to create prompt builder: %w", err)
 	}
