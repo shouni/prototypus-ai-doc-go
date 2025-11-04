@@ -139,7 +139,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	}
 	promptBuilder, err := prompt.NewBuilder(templateStr)
 	if err != nil {
-		return pipeline.GenerateHandler{}, fmt.Errorf("failed to create prompt builder: %w", err)
+		return pipeline.GenerateHandler{}, fmt.Errorf("プロンプトビルダーの作成に失敗しました: %w", err)
 	}
 
 	// 3. AIクライアントの初期化
