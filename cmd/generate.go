@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"time"
 
@@ -22,15 +21,11 @@ import (
 var opts pipeline.GenerateOptions
 
 // defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
-// defaultVoicevoxAPIURL はVOICEVOX APIのデフォルトURLです。
-// NOTE: voicevox.DefaultMaxParallelSegments, voicevox.DefaultSegmentTimeout はvoicevoxパッケージから直接参照
-const (
-	defaultHTTPTimeout    = 30 * time.Second
-	defaultVoicevoxAPIURL = "http://localhost:50021"
-)
-
 // defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
-const defaultModel = "gemini-2.5-flash"
+const (
+	defaultHTTPTimeout = 30 * time.Second
+	defaultModel       = "gemini-2.5-flash"
+)
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
@@ -70,48 +65,6 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	return aiClient, nil
 }
 
-// initializeVoicevoxExecutor は VOICEVOX クライアント、話者データ、および実行エンジンを初期化します。
-func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, voicevoxOutput bool) (voicevox.EngineExecutor, error) {
-	if !voicevoxOutput {
-		return nil, nil // VOICEVOX機能を使用しない場合はnilを返す
-	}
-
-	// 1-1. クライアントの初期化
-	voicevoxAPIURL := os.Getenv("VOICEVOX_API_URL")
-	if voicevoxAPIURL == "" {
-		voicevoxAPIURL = defaultVoicevoxAPIURL
-		slog.Warn("VOICEVOX_API_URL 環境変数が設定されていません。デフォルト値を使用します。", "default_url", voicevoxAPIURL)
-	}
-	// httpTimeout (Web抽出用と同じ) をクライアントに適用
-	voicevoxClient := voicevox.NewClient(voicevoxAPIURL, httpTimeout)
-
-	slog.Info("VOICEVOXスタイルデータをロード中...")
-
-	// 1-2. SpeakerDataのロード (Engine初期化の必須依存)
-	// ロード処理のタイムアウトを設定 (httpTimeoutを使用)
-	loadCtx, cancel := context.WithTimeout(ctx, httpTimeout)
-	defer cancel()
-
-	speakerData, loadErr := voicevox.LoadSpeakers(loadCtx, voicevoxClient)
-	if loadErr != nil {
-		return nil, fmt.Errorf("VOICEVOXエンジンへの接続または話者データのロードに失敗しました: %w", loadErr)
-	}
-	slog.Info("VOICEVOXスタイルデータのロード完了。")
-
-	// 1-3. EngineConfigの設定
-	engineConfig := voicevox.EngineConfig{
-		MaxParallelSegments: voicevox.DefaultMaxParallelSegments,
-		SegmentTimeout:      voicevox.DefaultSegmentTimeout,
-	}
-
-	// 1-4. Engineの組み立てとExecutorとしての返却
-	parser := voicevox.NewTextParser()
-	// voicevox.NewEngine は voicevox.EngineExecutor インターフェースを満たす具象型を返す
-	voicevoxExecutor := voicevox.NewEngine(voicevoxClient, speakerData, parser, engineConfig)
-
-	return voicevoxExecutor, nil
-}
-
 // setupDependencies は、RunEの実行に必要な全ての依存関係（クライアント、エクストラクタなど）を初期化し、
 // RunGenerateを実行するためのHandlerを返します。
 func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
@@ -146,7 +99,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	}
 
 	// 4. VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "")
+	voicevoxExecutor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "")
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
