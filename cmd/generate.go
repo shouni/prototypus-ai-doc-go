@@ -102,8 +102,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 	}
 
 	// 4. VOICEVOX エンジンパイプラインの初期化
-	//voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "")
-	voicevoxExecutor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true)
+	voicevoxExecutor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "")
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
