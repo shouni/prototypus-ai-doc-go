@@ -115,7 +115,7 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 func (h *GenerateHandler) readFromURL(ctx context.Context) ([]byte, error) {
 	slog.Info("URLからコンテンツを取得中", "url", h.Options.ScriptURL, "timeout", h.Options.HTTPTimeout.String())
 
-	text, hasBodyFound, err := h.Extractor.FetchAndExtractText(h.Options.ScriptURL, ctx)
+	text, hasBodyFound, err := h.Extractor.FetchAndExtractText(ctx, h.Options.ScriptURL)
 	if err != nil {
 		return nil, fmt.Errorf("URLからのコンテンツ取得に失敗しました: %w", err)
 	}
