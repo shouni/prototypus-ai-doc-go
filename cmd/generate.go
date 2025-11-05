@@ -21,14 +21,11 @@ import (
 var opts pipeline.GenerateOptions
 
 // defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
-// defaultVoicevoxAPIURL はVOICEVOX APIのデフォルトURLです。
-// NOTE: voicevox.DefaultMaxParallelSegments, voicevox.DefaultSegmentTimeout はvoicevoxパッケージから直接参照
+// defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
 const (
 	defaultHTTPTimeout = 30 * time.Second
+	defaultModel       = "gemini-2.5-flash"
 )
-
-// defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
-const defaultModel = "gemini-2.5-flash"
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
