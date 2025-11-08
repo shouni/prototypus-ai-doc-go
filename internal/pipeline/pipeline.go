@@ -51,7 +51,7 @@ type GenerateHandler struct {
 	Extractor              *extract.Extractor
 	PromptBuilder          PromptBuilder
 	AiClient               *gemini.Client
-	VoicevoxEngineExecutor voicevox.EngineExecutor // voicevox.Executor へのリネームを仮定しなかった場合
+	VoicevoxEngineExecutor voicevox.EngineExecutor
 }
 
 // --------------------------------------------------------------------------------
