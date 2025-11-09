@@ -52,8 +52,8 @@ github.com/shouni/go-http-kit v1.1.0 h1:kMQOsrqpeLkm3F2mDek1ZmXh2cINLTu4QazHs7Xe
 github.com/shouni/go-http-kit v1.1.0/go.mod h1:CFk1CJbTqRskKB70qbn+q2fVyH9zXNp9KWQuWp/lwFY=
 github.com/shouni/go-utils v1.0.8 h1:zUHDEIHvDkQTLC+VxnnkQHnRztbubTbXFwVxrPywWgU=
 github.com/shouni/go-utils v1.0.8/go.mod h1:dQxOuVTvWFHWEH/G6izteLh+tubkI5Sl1jpDWlCSkBU=
-github.com/shouni/go-voicevox v1.1.3 h1:62bQjvn+lpxtmxV+gUOZlCZeEX6vNJgTctR+m+po+/M=
-github.com/shouni/go-voicevox v1.1.3/go.mod h1:Fqzy7EB2JPs78PxSBESJ5Ji6T+UaSTE1FZZvffAzC0c=
+github.com/shouni/go-voicevox v1.1.5 h1:kAV88kdHfKTJGN8jzG9+0IfC9VnzGVSqRfZSeSgQC7I=
+github.com/shouni/go-voicevox v1.1.5/go.mod h1:Fqzy7EB2JPs78PxSBESJ5Ji6T+UaSTE1FZZvffAzC0c=
 github.com/shouni/go-web-exact/v2 v2.0.10 h1:vNaeDhTAzdS+xsKwGqJkQ+HCVD8CvXPBToIdWctytuU=
 github.com/shouni/go-web-exact/v2 v2.0.10/go.mod h1:+e3qK5CvwKt+fkwBsxd+vjULisOZyq/mzIMwsUvxrVs=
 github.com/spf13/cobra v1.10.1 h1:lJeBwCfmrnXthfAupyUTzJ/J4Nc1RsHC/mSRU2dll/s=
