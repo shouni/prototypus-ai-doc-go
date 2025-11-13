@@ -3,12 +3,12 @@ module prototypus-ai-doc-go
 go 1.25.0
 
 require (
-	github.com/shouni/go-ai-client/v2 v2.0.2
+	github.com/shouni/go-ai-client/v2 v2.0.5
 	github.com/shouni/go-cli-base v1.0.5
-	github.com/shouni/go-http-kit v1.1.0
+	github.com/shouni/go-http-kit v1.1.2
 	github.com/shouni/go-utils v1.0.8
-	github.com/shouni/go-voicevox v1.1.5
-	github.com/shouni/go-web-exact/v2 v2.0.10
+	github.com/shouni/go-voicevox v1.1.6
+	github.com/shouni/go-web-exact/v2 v2.0.13
 	github.com/spf13/cobra v1.10.1
 )
 
@@ -40,7 +40,8 @@ require (
 	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
-	google.golang.org/genai v1.33.0 // indirect
+	golang.org/x/time v0.14.0 // indirect
+	google.golang.org/genai v1.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251002232023-7c0ddcbb5797 // indirect
 	google.golang.org/grpc v1.76.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
