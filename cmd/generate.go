@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
+	remoteioFactory "github.com/shouni/go-remote-io/pkg/factory"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 	"github.com/spf13/cobra"
@@ -65,6 +67,30 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	return aiClient, nil
 }
 
+// initializeRemoteIOFactory は、go-remote-io の Factory を初期化します。
+func initializeRemoteIOFactory(ctx context.Context) (remoteioFactory.Factory, error) {
+	clientFactory, err := remoteioFactory.NewClientFactory(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("リモートI/Oファクトリ (GCS) の初期化に失敗しました: %w", err)
+	}
+
+	return clientFactory, nil
+}
+
+// initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
+func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, remoteFactory remoteioFactory.Factory) (voicevox.EngineExecutor, error) {
+	if opts.VoicevoxOutput == "" {
+		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
+		return nil, nil // Executorインターフェースに対して nil を返す
+	}
+
+	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, remoteFactory)
+	if err != nil {
+		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
+	}
+	return executor, nil
+}
+
 // setupDependencies は、RunEの実行に必要な全ての依存関係（クライアント、エクストラクタなど）を初期化し、
 // RunGenerateを実行するためのHandlerを返します。
 func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
@@ -98,13 +124,19 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 		return pipeline.GenerateHandler{}, err
 	}
 
-	// 4. VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, opts.VoicevoxOutput != "")
+	// 4. Remote IO Factoryの初期化
+	remoteFactory, err := initializeRemoteIOFactory(ctx)
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
 
-	// 5. Handlerに依存関係を注入
+	// 5. VOICEVOX エンジンパイプラインの初期化
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, remoteFactory)
+	if err != nil {
+		return pipeline.GenerateHandler{}, err
+	}
+
+	// 6. Handlerに依存関係を注入
 	// pipeline.GenerateHandler のフィールドがインターフェース型であっても、
 	// ここで渡しているのは具象型(*prompt.Builder, *voicevox.Engine)なので問題なく代入される
 	handler := pipeline.GenerateHandler{
@@ -131,7 +163,7 @@ func initCmdFlags() {
 	generateCmd.Flags().BoolVarP(&opts.PostAPI,
 		"post-api", "p", false, "生成されたスクリプトを外部APIに投稿します。")
 	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput,
-		"voicevox", "v", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたファイル名に出力します (例: output.wav)。")
+		"voicevox", "v", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたパスに出力します (例: output.wav, gs://my-bucket/audio.wav)。")
 	generateCmd.Flags().DurationVar(&opts.HTTPTimeout,
 		"http-timeout", 30*time.Second, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 	generateCmd.Flags().StringVarP(&opts.AIModel,
