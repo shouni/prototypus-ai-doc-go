@@ -13,7 +13,7 @@ import (
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
-	remoteioFactory "github.com/shouni/go-remote-io/pkg/factory"
+	"github.com/shouni/go-remote-io/pkg/gcsfactory"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 	"github.com/spf13/cobra"
@@ -67,24 +67,24 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	return aiClient, nil
 }
 
-// initializeRemoteIOFactory は、go-remote-io の Factory を初期化します。
-func initializeRemoteIOFactory(ctx context.Context) (remoteioFactory.Factory, error) {
-	clientFactory, err := remoteioFactory.NewClientFactory(ctx)
+// initializeGCSFactory は、go-remote-io の GCS Factory を初期化します。
+func initializeGCSFactory(ctx context.Context) (gcsfactory.Factory, error) {
+	gcsFactory, err := gcsfactory.NewGCSClientFactory(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("リモートI/Oファクトリ (GCS) の初期化に失敗しました: %w", err)
+		return nil, fmt.Errorf("GCSファクトリの初期化に失敗しました: %w", err)
 	}
 
-	return clientFactory, nil
+	return gcsFactory, nil
 }
 
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
-func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, remoteFactory remoteioFactory.Factory) (voicevox.EngineExecutor, error) {
+func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, gcsFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
 	if opts.VoicevoxOutput == "" {
 		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
 		return nil, nil // Executorインターフェースに対して nil を返す
 	}
 
-	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, remoteFactory)
+	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, gcsFactory)
 	if err != nil {
 		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
 	}
@@ -124,14 +124,14 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 		return pipeline.GenerateHandler{}, err
 	}
 
-	// 4. Remote IO Factoryの初期化
-	remoteFactory, err := initializeRemoteIOFactory(ctx)
+	// 4. GCS Factoryの初期化
+	gcsFactory, err := initializeGCSFactory(ctx)
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
 
 	// 5. VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, remoteFactory)
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, gcsFactory)
 	if err != nil {
 		return pipeline.GenerateHandler{}, err
 	}
