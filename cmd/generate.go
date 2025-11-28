@@ -13,7 +13,7 @@ import (
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
-	remoteioFactory "github.com/shouni/go-remote-io/pkg/factory"
+	"github.com/shouni/go-remote-io/pkg/gcsfactory"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 	"github.com/spf13/cobra"
@@ -68,8 +68,8 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 }
 
 // initializeRemoteIOFactory は、go-remote-io の Factory を初期化します。
-func initializeRemoteIOFactory(ctx context.Context) (remoteioFactory.Factory, error) {
-	clientFactory, err := remoteioFactory.NewClientFactory(ctx)
+func initializeRemoteIOFactory(ctx context.Context) (gcsfactory.Factory, error) {
+	clientFactory, err := gcsfactory.NewGCSClientFactory(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("リモートI/Oファクトリ (GCS) の初期化に失敗しました: %w", err)
 	}
@@ -78,7 +78,7 @@ func initializeRemoteIOFactory(ctx context.Context) (remoteioFactory.Factory, er
 }
 
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
-func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, remoteFactory remoteioFactory.Factory) (voicevox.EngineExecutor, error) {
+func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, remoteFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
 	if opts.VoicevoxOutput == "" {
 		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
 		return nil, nil // Executorインターフェースに対して nil を返す
