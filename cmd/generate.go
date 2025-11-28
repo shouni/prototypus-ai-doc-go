@@ -78,13 +78,13 @@ func initializeGCSFactory(ctx context.Context) (gcsfactory.Factory, error) {
 }
 
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
-func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, remoteFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
+func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, gcsFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
 	if opts.VoicevoxOutput == "" {
 		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
 		return nil, nil // Executorインターフェースに対して nil を返す
 	}
 
-	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, remoteFactory)
+	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, gcsFactory)
 	if err != nil {
 		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
 	}
