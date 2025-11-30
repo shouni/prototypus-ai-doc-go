@@ -160,8 +160,6 @@ func initCmdFlags() {
 		"output-file", "o", "", "生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
 	generateCmd.Flags().StringVarP(&opts.Mode,
 		"mode", "m", "duet", "スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
-	generateCmd.Flags().BoolVarP(&opts.PostAPI,
-		"post-api", "p", false, "生成されたスクリプトを外部APIに投稿します。")
 	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput,
 		"voicevox", "v", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたパスに出力します (例: output.wav, gs://my-bucket/audio.wav)。")
 	generateCmd.Flags().DurationVar(&opts.HTTPTimeout,

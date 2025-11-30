@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"prototypus-ai-doc-go/internal/poster"
 	"prototypus-ai-doc-go/internal/prompt"
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
@@ -99,12 +98,7 @@ func (h *GenerateHandler) RunGenerate(ctx context.Context) error {
 	}
 
 	// 5. 通常のI/O出力
-	if err := h.handleFinalOutput(generatedScript); err != nil {
-		return err
-	}
-
-	// 6. API投稿オプションの処理
-	return h.handlePostAPI(inputContent, generatedScript)
+	return h.handleFinalOutput(generatedScript)
 }
 
 // --------------------------------------------------------------------------------
@@ -202,45 +196,4 @@ func (h *GenerateHandler) handleVoicevoxOutput(ctx context.Context, generatedScr
 // handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
 func (h *GenerateHandler) handleFinalOutput(generatedScript string) error {
 	return iohandler.WriteOutputString(h.Options.OutputFile, generatedScript)
-}
-
-// generatePostTitle は API 投稿用のタイトルを生成します。
-// (ロジックの変更なし - そのまま維持)
-func (h *GenerateHandler) generatePostTitle(inputContent []byte) string {
-	if h.Options.OutputFile != "" {
-		return h.Options.OutputFile
-	}
-
-	inputStr := string(inputContent)
-
-	if len(inputStr) == 0 {
-		return fmt.Sprintf("Generated Script (Empty Input) - Mode: %s", h.Options.Mode)
-	}
-
-	const maxLen = 50
-	preview := inputStr
-	if len(inputStr) > maxLen {
-		preview = inputStr[:maxLen] + "..."
-	}
-
-	return fmt.Sprintf("Generated Script (Stdin/File Preview): %s", preview)
-}
-
-// handlePostAPI は生成されたスクリプトを外部APIに投稿します。
-// (ロジックの変更なし - そのまま維持)
-func (h *GenerateHandler) handlePostAPI(inputContent []byte, generatedScript string) error {
-	if !h.Options.PostAPI {
-		return nil
-	}
-
-	title := h.generatePostTitle(inputContent)
-	slog.Info("外部APIに投稿中...")
-
-	if err := poster.PostToAPI(title, h.Options.Mode, generatedScript); err != nil {
-		slog.Warn("外部APIへの投稿に失敗しました。", "error", err)
-	} else {
-		slog.Info("外部APIへの投稿が完了しました。")
-	}
-
-	return nil
 }
