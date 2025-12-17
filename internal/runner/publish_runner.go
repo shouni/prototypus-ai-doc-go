@@ -32,16 +32,9 @@ func NewDefaultPublisherRunner(options config.GenerateOptions, voicevoxExecutor 
 
 // Run は公開処理のパイプライン全体を実行します。
 func (pr *DefaultPublisherRunner) Run(ctx context.Context, scriptContent string) error {
-	// VOICEVOX出力の処理
 	if pr.options.VoicevoxOutput != "" {
-		if err := pr.handleVoicevoxOutput(ctx, scriptContent); err != nil {
-			return err
-		}
-		// VOICEVOX出力が成功した場合、ここで処理を終了 (早期リターン)
-		return nil
+		return pr.handleVoicevoxOutput(ctx, scriptContent)
 	}
-
-	// 通常のI/O出力
 	return pr.handleFinalOutput(scriptContent)
 }
 
