@@ -35,7 +35,9 @@ func (pr *DefaultPublisherRunner) Run(ctx context.Context, scriptContent string)
 	if pr.options.VoicevoxOutput != "" {
 		return pr.handleVoicevoxOutput(ctx, scriptContent)
 	}
-	return pr.handleFinalOutput(scriptContent)
+
+	// スクリプトをファイルまたは標準出力に出力します。
+	return iohandler.WriteOutputString(pr.options.OutputFile, scriptContent)
 }
 
 // --------------------------------------------------------------------------------
@@ -54,9 +56,4 @@ func (pr *DefaultPublisherRunner) handleVoicevoxOutput(ctx context.Context, scri
 	slog.Info("VOICEVOXによる音声合成が完了し、ファイルに保存されました。", "output_file", pr.options.VoicevoxOutput)
 
 	return nil
-}
-
-// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
-func (pr *DefaultPublisherRunner) handleFinalOutput(scriptContent string) error {
-	return iohandler.WriteOutputString(pr.options.OutputFile, scriptContent)
 }
