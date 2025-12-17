@@ -19,10 +19,5 @@ func Execute(
 		return fmt.Errorf("生成実行器の構築に失敗しました: %w", err)
 	}
 
-	err = runner.Run(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return runner.Run(ctx)
 }
