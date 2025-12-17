@@ -13,7 +13,6 @@ func Execute(
 	ctx context.Context,
 	opt config.GenerateOptions,
 ) error {
-
 	runner, err := builder.BuildGenerateRunner(ctx, opt)
 	if err != nil {
 		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す

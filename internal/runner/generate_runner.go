@@ -51,17 +51,13 @@ func NewDefaultGenerateRunner(
 
 // Run は実行します。
 func (gr *DefaultGenerateRunner) Run(ctx context.Context) error {
-
 	inputContent, err := gr.readInputContent(ctx)
 	if err != nil {
 		return err
 	}
 
 	// ログ出力
-	slog.Info("処理開始",
-		"mode", gr.options.Mode,
-		"model", gr.options.AIModel,
-		"input_size", len(inputContent))
+	slog.Info("処理開始", "mode", gr.options.Mode, "model", gr.options.AIModel, "input_size", len(inputContent))
 	slog.Info("AIによるスクリプト生成を開始します...")
 
 	// プロンプトの構築
@@ -76,7 +72,6 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) error {
 		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
 	generatedScript := generatedResponse.Text
-
 	slog.Info("AI スクリプト生成完了", "script_length", len(generatedScript))
 
 	// VOICEVOX出力の処理
@@ -98,7 +93,7 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) error {
 
 // readFromURL はURLからコンテンツを取得します。
 func (gr *DefaultGenerateRunner) readFromURL(ctx context.Context) ([]byte, error) {
-	slog.Info("URLからコンテンツを取得中", "url", gr.options.ScriptURL, "timeout", gr.options.HTTPTimeout.String())
+	slog.Info("URLからコンテンツを取得中", "url", gr.options.ScriptURL, "timeout")
 
 	text, hasBodyFound, err := gr.extractor.FetchAndExtractText(ctx, gr.options.ScriptURL)
 	if err != nil {

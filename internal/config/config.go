@@ -1,6 +1,8 @@
 package config
 
-import "time"
+import (
+	"time"
+)
 
 // DefaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
 // DefaultModel はデフォルトの Google Gemini モデル名（例: "gemini-2.5-flash"）を指定します。
