@@ -17,7 +17,7 @@ import (
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
-// GenerateRunner は、レビュー結果の公開処理を実行する責務を持つインターフェースです。
+// GenerateRunner は、ナレーションスクリプト生成を実行する責務を持つインターフェースです。
 type GenerateRunner interface {
 	Run(ctx context.Context) error
 }
@@ -49,6 +49,7 @@ func NewDefaultGenerateRunner(
 	}
 }
 
+// Run は実行します。
 func (gr *DefaultGenerateRunner) Run(ctx context.Context) error {
 
 	inputContent, err := gr.readInputContent(ctx)
@@ -123,10 +124,8 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 	case gr.options.ScriptURL != "":
 		inputContent, err = gr.readFromURL(ctx)
 	case gr.options.ScriptFile != "":
-		// 修正: iohandler.ReadInput を活用し、ファイル名または "-" (stdin) を渡す
 		inputContent, err = iohandler.ReadInput(gr.options.ScriptFile)
 	default:
-		// 修正: iohandler.ReadInput を活用し、ファイル名なし (= stdin) を渡す
 		inputContent, err = iohandler.ReadInput("")
 	}
 
@@ -138,7 +137,6 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 		return nil, err
 	}
 
-	// リファクタリング: 文字列化してTrimSpaceしてから len をチェック
 	trimmedContent := strings.TrimSpace(string(inputContent))
 	if len(trimmedContent) < config.MinInputContentLength {
 		return nil, fmt.Errorf("入力されたコンテンツが短すぎます (最低%dバイト必要です)。", config.MinInputContentLength)
@@ -154,7 +152,6 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 
 // buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
 func (gr *DefaultGenerateRunner) buildFullPrompt(inputText string) (string, error) {
-	// リファクタリング: InputText のTrimSpaceは readInputContent で行ったため、ここでは行わない
 	data := prompt.TemplateData{InputText: inputText}
 	fullPromptString, err := gr.promptBuilder.Build(data)
 	if err != nil {

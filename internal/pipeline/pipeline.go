@@ -8,8 +8,7 @@ import (
 	"prototypus-ai-doc-go/internal/config"
 )
 
-// Execute は、すべての依存関係を構築し、を実行します。
-// 実行結果の文字列とエラーを返します。
+// Execute は、すべての依存関係を構築し実行します。
 func Execute(
 	ctx context.Context,
 	opt config.GenerateOptions,
