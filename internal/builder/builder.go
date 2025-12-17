@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/prompt"
@@ -49,13 +50,13 @@ func initializeGCSFactory(ctx context.Context) (gcsfactory.Factory, error) {
 }
 
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
-func initializeVoicevoxExecutor(ctx context.Context, opts config.GenerateOptions, gcsFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
-	if opts.VoicevoxOutput == "" {
+func initializeVoicevoxExecutor(ctx context.Context, voicevoxOutput string, httpTimeout time.Duration, gcsFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
+	if voicevoxOutput == "" {
 		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
 		return nil, nil // Executorインターフェースに対して nil を返す
 	}
 
-	executor, err := voicevox.NewEngineExecutor(ctx, opts.HTTPTimeout, true, gcsFactory)
+	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, gcsFactory)
 	if err != nil {
 		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
 	}
@@ -66,12 +67,13 @@ func initializeVoicevoxExecutor(ctx context.Context, opts config.GenerateOptions
 // 実行可能な GenerateRunner のインスタンスを返します。
 func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runner.GenerateRunner, error) {
 	// --- タイムアウト値の調整 ---
-	if opts.HTTPTimeout == 0 {
-		opts.HTTPTimeout = config.DefaultHTTPTimeout
+	httpTimeout := opts.HTTPTimeout
+	if httpTimeout == 0 {
+		httpTimeout = config.DefaultHTTPTimeout
 	}
 
 	// 共通依存関係の初期化 (HTTPクライアント/Extractor)
-	fetcher := httpkit.New(opts.HTTPTimeout, httpkit.WithMaxRetries(3))
+	fetcher := httpkit.New(httpTimeout, httpkit.WithMaxRetries(3))
 	extractor, err := extract.NewExtractor(fetcher)
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
@@ -101,7 +103,7 @@ func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runn
 	}
 
 	// VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, opts, gcsFactory)
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, opts.VoicevoxOutput, httpTimeout, gcsFactory)
 	if err != nil {
 		return nil, err
 	}
