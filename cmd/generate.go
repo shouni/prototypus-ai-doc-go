@@ -1,33 +1,14 @@
 package cmd
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"log/slog"
-	"os"
-	"time"
-
+	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/pipeline"
-	"prototypus-ai-doc-go/internal/prompt"
 
-	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
-	"github.com/shouni/go-http-kit/pkg/httpkit"
-	"github.com/shouni/go-remote-io/pkg/gcsfactory"
-	"github.com/shouni/go-voicevox/pkg/voicevox"
-	"github.com/shouni/go-web-exact/v2/pkg/extract"
 	"github.com/spf13/cobra"
 )
 
 // グローバルなオプションインスタンス。
-var opts pipeline.GenerateOptions
-
-// defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
-// defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
-const (
-	defaultHTTPTimeout = 30 * time.Second
-	defaultModel       = "gemini-2.5-flash"
-)
+var opts config.GenerateOptions
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
@@ -35,135 +16,27 @@ var generateCmd = &cobra.Command{
 	Short: "AIにナレーションスクリプトを生成させます。",
 	Long: `AIに渡す元となる文章を指定し、ナレーションスクリプトを生成します。
 Webページやファイル、標準入力から文章を読み込むことができます。`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
-		// --- 1. 依存関係をセットアップし、Handlerを取得 ---
-		handler, err := setupDependencies(ctx)
-		if err != nil {
-			return err // 初期化失敗
-		}
-
-		// --- 2. 実行ロジック ---
-		return handler.RunGenerate(ctx)
-	},
+	RunE: generateCommand,
 }
 
-func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
-	// AI APIキーは環境変数からのみ取得
-	finalAPIKey := os.Getenv("GEMINI_API_KEY")
-
-	if finalAPIKey == "" {
-		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY を確認してください。")
-	}
-
-	clientConfig := gemini.Config{
-		APIKey: finalAPIKey,
-	}
-
-	aiClient, err := gemini.NewClient(ctx, clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
-	}
-	return aiClient, nil
+// init は generateCommand のフラグ定義を行います。
+func init() {
+	generateCmd.Flags().StringVarP(&opts.ScriptURL, "script-url", "u", "", "Webページからコンテンツを取得するためのURL。")
+	generateCmd.Flags().StringVarP(&opts.ScriptFile, "script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます。)")
+	generateCmd.Flags().StringVarP(&opts.OutputFile, "output-file", "o", "", "生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
+	generateCmd.Flags().StringVarP(&opts.Mode, "mode", "m", "duet", "スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
+	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput, "voicevox", "v", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたパスに出力します (例: output.wav, gs://my-bucket/audio.wav)。")
+	generateCmd.Flags().StringVarP(&opts.AIModel, "model", "g", config.DefaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
+	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", config.DefaultHTTPTimeout, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 }
 
-// initializeGCSFactory は、go-remote-io の GCS Factory を初期化します。
-func initializeGCSFactory(ctx context.Context) (gcsfactory.Factory, error) {
-	gcsFactory, err := gcsfactory.NewGCSClientFactory(ctx)
+// generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
+func generateCommand(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	err := pipeline.Execute(ctx, opts)
 	if err != nil {
-		return nil, fmt.Errorf("GCSファクトリの初期化に失敗しました: %w", err)
+		return err
 	}
 
-	return gcsFactory, nil
-}
-
-// initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
-func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, gcsFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
-	if opts.VoicevoxOutput == "" {
-		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
-		return nil, nil // Executorインターフェースに対して nil を返す
-	}
-
-	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, gcsFactory)
-	if err != nil {
-		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
-	}
-	return executor, nil
-}
-
-// setupDependencies は、RunEの実行に必要な全ての依存関係（クライアント、エクストラクタなど）を初期化し、
-// RunGenerateを実行するためのHandlerを返します。
-func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
-	// --- タイムアウト値の調整 ---
-	httpTimeout := opts.HTTPTimeout
-	if httpTimeout == 0 {
-		httpTimeout = defaultHTTPTimeout
-	}
-
-	// 1. 共通依存関係の初期化 (HTTPクライアント/Extractor)
-	fetcher := httpkit.New(httpTimeout, httpkit.WithMaxRetries(3))
-	extractor, err := extract.NewExtractor(fetcher)
-	if err != nil {
-		return pipeline.GenerateHandler{}, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
-	}
-
-	// 2. promptBuilderの初期化
-	templateStr, err := prompt.GetPromptByMode(opts.Mode)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err // モードが無効な場合のエラー
-	}
-	promptBuilder, err := prompt.NewBuilder(templateStr)
-	if err != nil {
-		// NewBuilderが解析エラーを返した場合は、それをラップして返却
-		return pipeline.GenerateHandler{}, fmt.Errorf("プロンプトビルダーの作成に失敗しました: %w", err)
-	}
-
-	// 3. AIクライアントの初期化
-	aiClient, err := initializeAIClient(ctx)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err
-	}
-
-	// 4. GCS Factoryの初期化
-	gcsFactory, err := initializeGCSFactory(ctx)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err
-	}
-
-	// 5. VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, gcsFactory)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err
-	}
-
-	// 6. Handlerに依存関係を注入
-	// pipeline.GenerateHandler のフィールドがインターフェース型であっても、
-	// ここで渡しているのは具象型(*prompt.Builder, *voicevox.Engine)なので問題なく代入される
-	handler := pipeline.GenerateHandler{
-		Options:                opts,
-		Extractor:              extractor,
-		PromptBuilder:          promptBuilder,
-		AiClient:               aiClient,
-		VoicevoxEngineExecutor: voicevoxExecutor,
-	}
-
-	return handler, nil
-}
-
-// initCmdFlags は generateCmd のフラグ定義を行います。
-func initCmdFlags() {
-	generateCmd.Flags().StringVarP(&opts.ScriptURL,
-		"script-url", "u", "", "Webページからコンテンツを取得するためのURL。")
-	generateCmd.Flags().StringVarP(&opts.ScriptFile,
-		"script-file", "f", "", "入力スクリプトファイルのパス ('-'を指定すると標準入力から読み込みます。)")
-	generateCmd.Flags().StringVarP(&opts.OutputFile,
-		"output-file", "o", "", "生成されたスクリプトを保存するファイルのパス。省略時は標準出力 (stdout) に出力します。")
-	generateCmd.Flags().StringVarP(&opts.Mode,
-		"mode", "m", "duet", "スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
-	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput,
-		"voicevox", "v", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたパスに出力します (例: output.wav, gs://my-bucket/audio.wav)。")
-	generateCmd.Flags().DurationVar(&opts.HTTPTimeout,
-		"http-timeout", 30*time.Second, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
-	generateCmd.Flags().StringVarP(&opts.AIModel,
-		"model", "g", defaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
+	return nil
 }
