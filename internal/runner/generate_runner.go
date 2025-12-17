@@ -71,10 +71,9 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
-	generatedScript := generatedResponse.Text
-	slog.Info("AI スクリプト生成完了", "script_length", len(generatedScript))
+	slog.Info("AI スクリプト生成完了", "script_length", len(generatedResponse.Text))
 
-	return generatedScript, nil
+	return generatedResponse.Text, nil
 }
 
 // --------------------------------------------------------------------------------
@@ -130,10 +129,6 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 	// TrimSpace後のバイト配列を返す
 	return []byte(trimmedContent), nil
 }
-
-// --------------------------------------------------------------------------------
-// ヘルパー関数 (AI/VOICEVOX処理)
-// --------------------------------------------------------------------------------
 
 // buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
 func (gr *DefaultGenerateRunner) buildFullPrompt(inputText string) (string, error) {
