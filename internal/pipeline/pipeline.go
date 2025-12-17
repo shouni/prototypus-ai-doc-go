@@ -3,6 +3,8 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"prototypus-ai-doc-go/internal/builder"
 	"prototypus-ai-doc-go/internal/config"
 )
@@ -16,7 +18,7 @@ func Execute(
 	if err != nil {
 		return err
 	}
-	if generatedScript == "" {
+	if strings.TrimSpace(generatedScript) == "" {
 		return fmt.Errorf("AIモデルが空のスクリプトを返しました。プロンプトや入力コンテンツに問題がないか確認してください")
 	}
 	err = publish(ctx, opt, generatedScript)
