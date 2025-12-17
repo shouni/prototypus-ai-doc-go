@@ -24,28 +24,27 @@ type GenerateRunner interface {
 
 // DefaultGenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
 type DefaultGenerateRunner struct {
-	options        config.GenerateOptions
-	extractor      *extract.Extractor
-	promptBuilder  prompt.PromptBuilder
-	aiClient       *gemini.Client
-	voicevoxEngine voicevox.EngineExecutor
+	options          config.GenerateOptions
+	extractor        *extract.Extractor
+	promptBuilder    prompt.PromptBuilder
+	aiClient         *gemini.Client
+	voicevoxExecutor voicevox.EngineExecutor
 }
 
-// NewDefaultGenerateRunner は DefaultGenerateRunner のコンストラクタです。
-// 通常、コンストラクタに context は不要なため削除していますが、初期化時に通信等が必要なら残してください。
+// NewDefaultGenerateRunner は、依存関係を注入して DefaultGenerateRunner の新しいインスタンスを生成します。
 func NewDefaultGenerateRunner(
 	options config.GenerateOptions,
 	extractor *extract.Extractor,
 	promptBuilder prompt.PromptBuilder,
 	aiClient *gemini.Client,
-	voicevoxEngine voicevox.EngineExecutor,
+	voicevoxExecutor voicevox.EngineExecutor,
 ) *DefaultGenerateRunner {
 	return &DefaultGenerateRunner{
-		options:        options,
-		extractor:      extractor,
-		promptBuilder:  promptBuilder,
-		aiClient:       aiClient,
-		voicevoxEngine: voicevoxEngine,
+		options:          options,
+		extractor:        extractor,
+		promptBuilder:    promptBuilder,
+		aiClient:         aiClient,
+		voicevoxExecutor: voicevoxExecutor,
 	}
 }
 
@@ -160,7 +159,7 @@ func (gr *DefaultGenerateRunner) buildFullPrompt(inputText string) (string, erro
 func (gr *DefaultGenerateRunner) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
 	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", gr.options.VoicevoxOutput)
 
-	err := gr.voicevoxEngine.Execute(ctx, generatedScript, gr.options.VoicevoxOutput)
+	err := gr.voicevoxExecutor.Execute(ctx, generatedScript, gr.options.VoicevoxOutput)
 
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
