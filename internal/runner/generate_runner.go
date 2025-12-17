@@ -93,7 +93,7 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) error {
 
 // readFromURL はURLからコンテンツを取得します。
 func (gr *DefaultGenerateRunner) readFromURL(ctx context.Context) ([]byte, error) {
-	slog.Info("URLからコンテンツを取得中", "url", gr.options.ScriptURL, "timeout")
+	slog.Info("URLからコンテンツを取得中", "url", gr.options.ScriptURL, "timeout", gr.options.HTTPTimeout.String())
 
 	text, hasBodyFound, err := gr.extractor.FetchAndExtractText(ctx, gr.options.ScriptURL)
 	if err != nil {

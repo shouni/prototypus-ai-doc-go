@@ -16,7 +16,7 @@ func Execute(
 	runner, err := builder.BuildGenerateRunner(ctx, opt)
 	if err != nil {
 		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す
-		return fmt.Errorf("レビュー実行器の構築に失敗しました: %w", err)
+		return fmt.Errorf("生成実行器の構築に失敗しました: %w", err)
 	}
 
 	err = runner.Run(ctx)

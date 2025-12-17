@@ -66,13 +66,12 @@ func initializeVoicevoxExecutor(ctx context.Context, opts config.GenerateOptions
 // 実行可能な GenerateRunner のインスタンスを返します。
 func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runner.GenerateRunner, error) {
 	// --- タイムアウト値の調整 ---
-	httpTimeout := opts.HTTPTimeout
-	if httpTimeout == 0 {
-		httpTimeout = config.DefaultHTTPTimeout
+	if opts.HTTPTimeout == 0 {
+		opts.HTTPTimeout = config.DefaultHTTPTimeout
 	}
 
 	// 共通依存関係の初期化 (HTTPクライアント/Extractor)
-	fetcher := httpkit.New(httpTimeout, httpkit.WithMaxRetries(3))
+	fetcher := httpkit.New(opts.HTTPTimeout, httpkit.WithMaxRetries(3))
 	extractor, err := extract.NewExtractor(fetcher)
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
