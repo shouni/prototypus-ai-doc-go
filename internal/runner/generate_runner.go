@@ -13,7 +13,6 @@ import (
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 	"github.com/shouni/go-utils/iohandler"
-	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
@@ -24,16 +23,15 @@ type promptBuilder interface {
 
 // GenerateRunner は、ナレーションスクリプト生成を実行する責務を持つインターフェースです。
 type GenerateRunner interface {
-	Run(ctx context.Context) error
+	Run(ctx context.Context) (string, error)
 }
 
 // DefaultGenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
 type DefaultGenerateRunner struct {
-	options          config.GenerateOptions
-	extractor        *extract.Extractor
-	promptBuilder    promptBuilder
-	aiClient         *gemini.Client
-	voicevoxExecutor voicevox.EngineExecutor
+	options       config.GenerateOptions
+	extractor     *extract.Extractor
+	promptBuilder promptBuilder
+	aiClient      *gemini.Client
 }
 
 // NewDefaultGenerateRunner は、依存関係を注入して DefaultGenerateRunner の新しいインスタンスを生成します。
@@ -42,22 +40,20 @@ func NewDefaultGenerateRunner(
 	extractor *extract.Extractor,
 	promptBuilder promptBuilder,
 	aiClient *gemini.Client,
-	voicevoxExecutor voicevox.EngineExecutor,
 ) *DefaultGenerateRunner {
 	return &DefaultGenerateRunner{
-		options:          options,
-		extractor:        extractor,
-		promptBuilder:    promptBuilder,
-		aiClient:         aiClient,
-		voicevoxExecutor: voicevoxExecutor,
+		options:       options,
+		extractor:     extractor,
+		promptBuilder: promptBuilder,
+		aiClient:      aiClient,
 	}
 }
 
 // Run は実行します。
-func (gr *DefaultGenerateRunner) Run(ctx context.Context) error {
+func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 	inputContent, err := gr.readInputContent(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// ログ出力
@@ -67,28 +63,30 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) error {
 	// プロンプトの構築
 	promptContent, err := gr.buildFullPrompt(string(inputContent))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// AIによるスクリプト生成
 	generatedResponse, err := gr.aiClient.GenerateContent(ctx, promptContent, gr.options.AIModel)
 	if err != nil {
-		return fmt.Errorf("スクリプト生成に失敗しました: %w", err)
+		return "", fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
 	generatedScript := generatedResponse.Text
 	slog.Info("AI スクリプト生成完了", "script_length", len(generatedScript))
 
-	// VOICEVOX出力の処理
-	if gr.options.VoicevoxOutput != "" {
-		if err := gr.handleVoicevoxOutput(ctx, generatedScript); err != nil {
-			return err
-		}
-		// VOICEVOX出力が成功した場合、ここで処理を終了 (早期リターン)
-		return nil
-	}
+	return generatedScript, nil
 
-	// 通常のI/O出力
-	return gr.handleFinalOutput(generatedScript)
+	//// VOICEVOX出力の処理
+	//if gr.options.VoicevoxOutput != "" {
+	//	if err := gr.handleVoicevoxOutput(ctx, generatedScript); err != nil {
+	//		return err
+	//	}
+	//	// VOICEVOX出力が成功した場合、ここで処理を終了 (早期リターン)
+	//	return nil
+	//}
+	//
+	//// 通常のI/O出力
+	//return gr.handleFinalOutput(generatedScript)
 }
 
 // --------------------------------------------------------------------------------
@@ -160,25 +158,25 @@ func (gr *DefaultGenerateRunner) buildFullPrompt(inputText string) (string, erro
 	return fullPromptString, nil
 }
 
-// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
-func (gr *DefaultGenerateRunner) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
-	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", gr.options.VoicevoxOutput)
-
-	err := gr.voicevoxExecutor.Execute(ctx, generatedScript, gr.options.VoicevoxOutput)
-
-	if err != nil {
-		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
-	}
-	slog.Info("VOICEVOXによる音声合成が完了し、ファイルに保存されました。", "output_file", gr.options.VoicevoxOutput)
-
-	return nil
-}
-
-// --------------------------------------------------------------------------------
-// ヘルパー関数 (出力処理)
-// --------------------------------------------------------------------------------
-
-// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
-func (gr *DefaultGenerateRunner) handleFinalOutput(generatedScript string) error {
-	return iohandler.WriteOutputString(gr.options.OutputFile, generatedScript)
-}
+//// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
+//func (gr *DefaultGenerateRunner) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
+//	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", gr.options.VoicevoxOutput)
+//
+//	err := gr.voicevoxExecutor.Execute(ctx, generatedScript, gr.options.VoicevoxOutput)
+//
+//	if err != nil {
+//		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
+//	}
+//	slog.Info("VOICEVOXによる音声合成が完了し、ファイルに保存されました。", "output_file", gr.options.VoicevoxOutput)
+//
+//	return nil
+//}
+//
+//// --------------------------------------------------------------------------------
+//// ヘルパー関数 (出力処理)
+//// --------------------------------------------------------------------------------
+//
+//// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
+//func (gr *DefaultGenerateRunner) handleFinalOutput(generatedScript string) error {
+//	return iohandler.WriteOutputString(gr.options.OutputFile, generatedScript)
+//}
