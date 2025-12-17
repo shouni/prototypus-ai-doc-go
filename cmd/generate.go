@@ -10,13 +10,6 @@ import (
 // グローバルなオプションインスタンス。
 var opts config.GenerateOptions
 
-//// defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
-//// defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
-//const (
-//	defaultHTTPTimeout = 30 * time.Second
-//	defaultModel       = "gemini-2.5-flash"
-//)
-
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
 	Use:   "generate",
@@ -26,6 +19,7 @@ Webページやファイル、標準入力から文章を読み込むことが�
 	RunE: generateCommand,
 }
 
+// generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
 func generateCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
@@ -36,110 +30,6 @@ func generateCommand(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
-/*
-func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
-	// AI APIキーは環境変数からのみ取得
-	finalAPIKey := os.Getenv("GEMINI_API_KEY")
-
-	if finalAPIKey == "" {
-		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY を確認してください。")
-	}
-
-	clientConfig := gemini.Config{
-		APIKey: finalAPIKey,
-	}
-
-	aiClient, err := gemini.NewClient(ctx, clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
-	}
-	return aiClient, nil
-}
-
-// initializeGCSFactory は、go-remote-io の GCS Factory を初期化します。
-func initializeGCSFactory(ctx context.Context) (gcsfactory.Factory, error) {
-	gcsFactory, err := gcsfactory.NewGCSClientFactory(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("GCSファクトリの初期化に失敗しました: %w", err)
-	}
-
-	return gcsFactory, nil
-}
-
-// initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
-func initializeVoicevoxExecutor(ctx context.Context, httpTimeout time.Duration, gcsFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
-	if opts.VoicevoxOutput == "" {
-		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
-		return nil, nil // Executorインターフェースに対して nil を返す
-	}
-
-	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, gcsFactory)
-	if err != nil {
-		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
-	}
-	return executor, nil
-}
-
-// setupDependencies は、RunEの実行に必要な全ての依存関係（クライアント、エクストラクタなど）を初期化し、
-// RunGenerateを実行するためのHandlerを返します。
-func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
-	// --- タイムアウト値の調整 ---
-	httpTimeout := opts.HTTPTimeout
-	if httpTimeout == 0 {
-		httpTimeout = defaultHTTPTimeout
-	}
-
-	// 1. 共通依存関係の初期化 (HTTPクライアント/Extractor)
-	fetcher := httpkit.New(httpTimeout, httpkit.WithMaxRetries(3))
-	extractor, err := extract.NewExtractor(fetcher)
-	if err != nil {
-		return pipeline.GenerateHandler{}, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
-	}
-
-	// 2. promptBuilderの初期化
-	templateStr, err := prompt.GetPromptByMode(opts.Mode)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err // モードが無効な場合のエラー
-	}
-	promptBuilder, err := prompt.NewBuilder(templateStr)
-	if err != nil {
-		// NewBuilderが解析エラーを返した場合は、それをラップして返却
-		return pipeline.GenerateHandler{}, fmt.Errorf("プロンプトビルダーの作成に失敗しました: %w", err)
-	}
-
-	// 3. AIクライアントの初期化
-	aiClient, err := initializeAIClient(ctx)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err
-	}
-
-	// 4. GCS Factoryの初期化
-	gcsFactory, err := initializeGCSFactory(ctx)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err
-	}
-
-	// 5. VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, httpTimeout, gcsFactory)
-	if err != nil {
-		return pipeline.GenerateHandler{}, err
-	}
-
-	// 6. Handlerに依存関係を注入
-	// pipeline.GenerateHandler のフィールドがインターフェース型であっても、
-	// ここで渡しているのは具象型(*prompt.Builder, *voicevox.Engine)なので問題なく代入される
-	handler := pipeline.GenerateHandler{
-		Options:                opts,
-		Extractor:              extractor,
-		PromptBuilder:          promptBuilder,
-		AiClient:               aiClient,
-		VoicevoxEngineExecutor: voicevoxExecutor,
-	}
-
-	return handler, nil
-}
-*/
 
 // initCmdFlags は generateCmd のフラグ定義を行います。
 func initCmdFlags() {

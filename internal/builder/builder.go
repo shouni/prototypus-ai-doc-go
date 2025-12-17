@@ -18,6 +18,7 @@ import (
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
+// initializeAIClient は、gemini を初期化します。
 func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	// AI APIキーは環境変数からのみ取得
 	finalAPIKey := os.Getenv("GEMINI_API_KEY")
