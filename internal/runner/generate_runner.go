@@ -17,6 +17,11 @@ import (
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
+// promptBuilderインターフェースをrunnerパッケージ内で定義する
+type promptBuilder interface {
+	Build(data prompt.TemplateData) (string, error)
+}
+
 // GenerateRunner は、ナレーションスクリプト生成を実行する責務を持つインターフェースです。
 type GenerateRunner interface {
 	Run(ctx context.Context) error
@@ -26,7 +31,7 @@ type GenerateRunner interface {
 type DefaultGenerateRunner struct {
 	options          config.GenerateOptions
 	extractor        *extract.Extractor
-	promptBuilder    prompt.PromptBuilder
+	promptBuilder    promptBuilder
 	aiClient         *gemini.Client
 	voicevoxExecutor voicevox.EngineExecutor
 }
@@ -35,7 +40,7 @@ type DefaultGenerateRunner struct {
 func NewDefaultGenerateRunner(
 	options config.GenerateOptions,
 	extractor *extract.Extractor,
-	promptBuilder prompt.PromptBuilder,
+	promptBuilder promptBuilder,
 	aiClient *gemini.Client,
 	voicevoxExecutor voicevox.EngineExecutor,
 ) *DefaultGenerateRunner {
