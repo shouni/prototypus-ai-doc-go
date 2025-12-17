@@ -96,6 +96,19 @@ func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runn
 		return nil, err
 	}
 
+	generateRunner := runner.NewDefaultGenerateRunner(
+		opts,
+		extractor,
+		promptBuilder,
+		aiClient,
+	)
+
+	return generateRunner, nil
+}
+
+// BuildPublisherRunner は、必要な依存関係をすべて構築し、
+// 実行可能な PublisherRunner のインスタンスを返します。
+func BuildPublisherRunner(ctx context.Context, opts config.GenerateOptions) (runner.PublisherRunner, error) {
 	// GCS Factoryの初期化
 	gcsFactory, err := initializeGCSFactory(ctx)
 	if err != nil {
@@ -103,19 +116,15 @@ func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runn
 	}
 
 	// VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, opts.VoicevoxOutput, httpTimeout, gcsFactory)
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, opts.VoicevoxOutput, opts.HTTPTimeout, gcsFactory)
 	if err != nil {
 		return nil, err
 	}
 
-	// Handlerに依存関係を注入
-	generateRunner := runner.NewDefaultGenerateRunner(
+	publisherRunner := runner.NewDefaultPublisherRunner(
 		opts,
-		extractor,
-		promptBuilder,
-		aiClient,
 		voicevoxExecutor,
 	)
 
-	return generateRunner, nil
+	return publisherRunner, nil
 }
