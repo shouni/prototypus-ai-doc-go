@@ -27,7 +27,7 @@ func Execute(
 	return nil
 }
 
-// Generate は、すべての依存関係を構築し、スクリプトテキスト作成を実行します。
+// generate は、すべての依存関係を構築し、スクリプトテキスト作成を実行します。
 // 実行結果の文字列とエラーを返します。
 func generate(
 	ctx context.Context,
@@ -47,7 +47,7 @@ func generate(
 	return generatedScript, nil
 }
 
-// Publish は、すべての依存関係を構築し、パブリッシュパイプラインを実行します。
+// publish は、すべての依存関係を構築し、パブリッシュパイプラインを実行します。
 func publish(
 	ctx context.Context,
 	opt config.GenerateOptions,
