@@ -11,12 +11,12 @@ import (
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 )
 
-// PublisherRunner は、レビュー結果の公開処理を実行する責務を持つインターフェースです。
+// PublisherRunner は、生成されたスクリプトの公開処理を実行する責務を持つインターフェースです。
 type PublisherRunner interface {
 	Run(ctx context.Context, scriptContent string) error
 }
 
-// DefaultPublisherRunner は、レビュー結果の公開処理を実行する具象構造体です。
+// DefaultPublisherRunner は、スクリプトの公開処理を実行する具象構造体です。
 type DefaultPublisherRunner struct {
 	options          config.GenerateOptions
 	voicevoxExecutor voicevox.EngineExecutor

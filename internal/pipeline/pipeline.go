@@ -16,6 +16,9 @@ func Execute(
 	if err != nil {
 		return err
 	}
+	if generatedScript == "" {
+		return fmt.Errorf("AIによって生成されたスクリプトが空です")
+	}
 	err = publish(ctx, opt, generatedScript)
 	if err != nil {
 		return err
