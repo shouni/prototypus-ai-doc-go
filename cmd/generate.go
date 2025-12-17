@@ -1,33 +1,21 @@
 package cmd
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"log/slog"
-	"os"
-	"time"
-
+	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/pipeline"
-	"prototypus-ai-doc-go/internal/prompt"
 
-	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
-	"github.com/shouni/go-http-kit/pkg/httpkit"
-	"github.com/shouni/go-remote-io/pkg/gcsfactory"
-	"github.com/shouni/go-voicevox/pkg/voicevox"
-	"github.com/shouni/go-web-exact/v2/pkg/extract"
 	"github.com/spf13/cobra"
 )
 
 // グローバルなオプションインスタンス。
-var opts pipeline.GenerateOptions
+var opts config.GenerateOptions
 
-// defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
-// defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
-const (
-	defaultHTTPTimeout = 30 * time.Second
-	defaultModel       = "gemini-2.5-flash"
-)
+//// defaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
+//// defaultModel specifies the default Google Gemini model name used when no model is explicitly provided.
+//const (
+//	defaultHTTPTimeout = 30 * time.Second
+//	defaultModel       = "gemini-2.5-flash"
+//)
 
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
@@ -35,19 +23,21 @@ var generateCmd = &cobra.Command{
 	Short: "AIにナレーションスクリプトを生成させます。",
 	Long: `AIに渡す元となる文章を指定し、ナレーションスクリプトを生成します。
 Webページやファイル、標準入力から文章を読み込むことができます。`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
-		// --- 1. 依存関係をセットアップし、Handlerを取得 ---
-		handler, err := setupDependencies(ctx)
-		if err != nil {
-			return err // 初期化失敗
-		}
-
-		// --- 2. 実行ロジック ---
-		return handler.RunGenerate(ctx)
-	},
+	RunE: generateCommand,
 }
 
+func generateCommand(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+
+	err := pipeline.Execute(ctx, opts)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+/*
 func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	// AI APIキーは環境変数からのみ取得
 	finalAPIKey := os.Getenv("GEMINI_API_KEY")
@@ -149,6 +139,7 @@ func setupDependencies(ctx context.Context) (pipeline.GenerateHandler, error) {
 
 	return handler, nil
 }
+*/
 
 // initCmdFlags は generateCmd のフラグ定義を行います。
 func initCmdFlags() {
@@ -162,8 +153,8 @@ func initCmdFlags() {
 		"mode", "m", "duet", "スクリプト生成モード。'dialogue', 'solo', 'duet' などを指定します。")
 	generateCmd.Flags().StringVarP(&opts.VoicevoxOutput,
 		"voicevox", "v", "", "生成されたスクリプトをVOICEVOXエンジンで合成し、指定されたパスに出力します (例: output.wav, gs://my-bucket/audio.wav)。")
-	generateCmd.Flags().DurationVar(&opts.HTTPTimeout,
-		"http-timeout", 30*time.Second, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 	generateCmd.Flags().StringVarP(&opts.AIModel,
-		"model", "g", defaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
+		"model", "g", config.DefaultModel, "使用する Google Gemini モデル名 (例: gemini-2.5-flash, gemini-2.5-pro)")
+	generateCmd.Flags().DurationVar(&opts.HTTPTimeout,
+		"http-timeout", config.DefaultHTTPTimeout, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 }
