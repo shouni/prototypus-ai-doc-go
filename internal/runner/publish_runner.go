@@ -23,7 +23,6 @@ type DefaultPublisherRunner struct {
 }
 
 // NewDefaultPublisherRunner は DefaultPublisherRunner の新しいインスタンスを作成します。
-// options は config.Config (または GenerateOptions) を想定しています。
 func NewDefaultPublisherRunner(options config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor) *DefaultPublisherRunner {
 	return &DefaultPublisherRunner{
 		options:          options,
@@ -51,10 +50,10 @@ func (pr *DefaultPublisherRunner) Run(ctx context.Context, scriptContent string)
 // --------------------------------------------------------------------------------
 
 // handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
-func (pr *DefaultPublisherRunner) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
+func (pr *DefaultPublisherRunner) handleVoicevoxOutput(ctx context.Context, scriptContent string) error {
 	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", pr.options.VoicevoxOutput)
 
-	err := pr.voicevoxExecutor.Execute(ctx, generatedScript, pr.options.VoicevoxOutput)
+	err := pr.voicevoxExecutor.Execute(ctx, scriptContent, pr.options.VoicevoxOutput)
 
 	if err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
@@ -65,6 +64,6 @@ func (pr *DefaultPublisherRunner) handleVoicevoxOutput(ctx context.Context, gene
 }
 
 // handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
-func (pr *DefaultPublisherRunner) handleFinalOutput(generatedScript string) error {
-	return iohandler.WriteOutputString(pr.options.OutputFile, generatedScript)
+func (pr *DefaultPublisherRunner) handleFinalOutput(scriptContent string) error {
+	return iohandler.WriteOutputString(pr.options.OutputFile, scriptContent)
 }

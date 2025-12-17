@@ -75,18 +75,6 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 	slog.Info("AI スクリプト生成完了", "script_length", len(generatedScript))
 
 	return generatedScript, nil
-
-	//// VOICEVOX出力の処理
-	//if gr.options.VoicevoxOutput != "" {
-	//	if err := gr.handleVoicevoxOutput(ctx, generatedScript); err != nil {
-	//		return err
-	//	}
-	//	// VOICEVOX出力が成功した場合、ここで処理を終了 (早期リターン)
-	//	return nil
-	//}
-	//
-	//// 通常のI/O出力
-	//return gr.handleFinalOutput(generatedScript)
 }
 
 // --------------------------------------------------------------------------------
@@ -157,26 +145,3 @@ func (gr *DefaultGenerateRunner) buildFullPrompt(inputText string) (string, erro
 
 	return fullPromptString, nil
 }
-
-//// handleVoicevoxOutput は VOICEVOX 処理を実行し、結果を出力します。
-//func (gr *DefaultGenerateRunner) handleVoicevoxOutput(ctx context.Context, generatedScript string) error {
-//	slog.InfoContext(ctx, "VOICEVOXエンジンに接続し、音声合成を開始します。", "output_file", gr.options.VoicevoxOutput)
-//
-//	err := gr.voicevoxExecutor.Execute(ctx, generatedScript, gr.options.VoicevoxOutput)
-//
-//	if err != nil {
-//		return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
-//	}
-//	slog.Info("VOICEVOXによる音声合成が完了し、ファイルに保存されました。", "output_file", gr.options.VoicevoxOutput)
-//
-//	return nil
-//}
-//
-//// --------------------------------------------------------------------------------
-//// ヘルパー関数 (出力処理)
-//// --------------------------------------------------------------------------------
-//
-//// handleFinalOutput はスクリプトをファイルまたは標準出力に出力します。
-//func (gr *DefaultGenerateRunner) handleFinalOutput(generatedScript string) error {
-//	return iohandler.WriteOutputString(gr.options.OutputFile, generatedScript)
-//}
