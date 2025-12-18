@@ -8,7 +8,7 @@ import (
 // DefaultModel はデフォルトの Google Gemini モデル名（例: "gemini-2.5-flash"）を指定します。
 // MinInputContentLength は入力されたコンテンツの最小バイト。
 const (
-	DefaultHTTPTimeout    = 30 * time.Second
+	DefaultHTTPTimeout    = 60 * time.Second
 	DefaultModel          = "gemini-2.5-flash"
 	MinInputContentLength = 10
 )
