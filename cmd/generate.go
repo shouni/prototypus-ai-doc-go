@@ -35,7 +35,11 @@ func init() {
 func generateCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	// HTTPクライアントの初期化
-	opts.HTTPClient = httpkit.New(opts.HTTPTimeout)
+	timeout := opts.HTTPTimeout
+	if timeout == 0 {
+		timeout = config.DefaultHTTPTimeout
+	}
+	opts.HTTPClient = httpkit.New(timeout, httpkit.WithMaxRetries(3))
 
 	err := pipeline.Execute(ctx, opts)
 	if err != nil {
