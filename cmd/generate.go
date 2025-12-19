@@ -33,7 +33,8 @@ func init() {
 // generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
 func generateCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	err := pipeline.Execute(ctx, opts)
+	appCtx := config.NewAppContext(opts)
+	err := pipeline.Execute(ctx, appCtx)
 	if err != nil {
 		return err
 	}

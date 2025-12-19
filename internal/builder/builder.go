@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/prompt"
@@ -15,6 +14,7 @@ import (
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/shouni/go-remote-io/pkg/gcsfactory"
+	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
@@ -39,24 +39,28 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 	return aiClient, nil
 }
 
-// initializeGCSFactory は、go-remote-io の GCS Factory を初期化します。
-func initializeGCSFactory(ctx context.Context) (gcsfactory.Factory, error) {
+// initializeOutputWriter は、go-remote-io の OutputWriter を初期化します。
+func initializeOutputWriter(ctx context.Context) (remoteio.OutputWriter, error) {
 	gcsFactory, err := gcsfactory.NewGCSClientFactory(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("GCSファクトリの初期化に失敗しました: %w", err)
+		return nil, fmt.Errorf("リモートストレージのクライアントファクトリ初期化に失敗しました: %w", err)
+	}
+	writer, err := gcsFactory.NewOutputWriter()
+	if err != nil {
+		return nil, fmt.Errorf("出力ライターの初期化に失敗しました: %w", err)
 	}
 
-	return gcsFactory, nil
+	return writer, nil
 }
 
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化し、不要な場合は nil を返します。
-func initializeVoicevoxExecutor(ctx context.Context, voicevoxOutput string, httpTimeout time.Duration, gcsFactory gcsfactory.Factory) (voicevox.EngineExecutor, error) {
+func initializeVoicevoxExecutor(ctx context.Context, httpClient httpkit.ClientInterface, writer remoteio.OutputWriter, voicevoxOutput string) (voicevox.EngineExecutor, error) {
 	if voicevoxOutput == "" {
 		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
 		return nil, nil // Executorインターフェースに対して nil を返す
 	}
 
-	executor, err := voicevox.NewEngineExecutor(ctx, httpTimeout, true, gcsFactory)
+	executor, err := voicevox.NewEngineExecutor(ctx, httpClient, writer, true)
 	if err != nil {
 		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
 	}
@@ -65,16 +69,9 @@ func initializeVoicevoxExecutor(ctx context.Context, voicevoxOutput string, http
 
 // BuildGenerateRunner は、必要な依存関係をすべて構築し、
 // 実行可能な GenerateRunner のインスタンスを返します。
-func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runner.GenerateRunner, error) {
-	// --- タイムアウト値の調整 ---
-	httpTimeout := opts.HTTPTimeout
-	if httpTimeout == 0 {
-		httpTimeout = config.DefaultHTTPTimeout
-	}
-
-	// 共通依存関係の初期化 (HTTPクライアント/Extractor)
-	fetcher := httpkit.New(httpTimeout, httpkit.WithMaxRetries(3))
-	extractor, err := extract.NewExtractor(fetcher)
+func BuildGenerateRunner(ctx context.Context, appCtx config.AppContext) (runner.GenerateRunner, error) {
+	opts := appCtx.Options
+	extractor, err := extract.NewExtractor(appCtx.HTTPClient)
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
@@ -108,15 +105,15 @@ func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runn
 
 // BuildPublisherRunner は、必要な依存関係をすべて構築し、
 // 実行可能な PublisherRunner のインスタンスを返します。
-func BuildPublisherRunner(ctx context.Context, opts config.GenerateOptions) (runner.PublisherRunner, error) {
-	// GCS Factoryの初期化
-	gcsFactory, err := initializeGCSFactory(ctx)
+func BuildPublisherRunner(ctx context.Context, appCtx config.AppContext) (runner.PublisherRunner, error) {
+	opts := appCtx.Options
+	writer, err := initializeOutputWriter(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, opts.VoicevoxOutput, opts.HTTPTimeout, gcsFactory)
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.HTTPClient, writer, opts.VoicevoxOutput)
 	if err != nil {
 		return nil, err
 	}
