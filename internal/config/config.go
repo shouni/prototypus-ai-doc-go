@@ -47,6 +47,8 @@ func NewAppContext(opts GenerateOptions) AppContext {
 	}
 }
 
+// Validate は、AppContextの必須フィールドが正しく初期化されていることを検証します。
+// アプリケーションの実行前に呼び出されることを想定しています。
 func (ac AppContext) Validate() error {
 	if ac.HTTPClient == nil {
 		return errors.New("HTTPClientが初期化されていません")
