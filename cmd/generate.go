@@ -4,7 +4,6 @@ import (
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/pipeline"
 
-	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/spf13/cobra"
 )
 
@@ -31,21 +30,10 @@ func init() {
 	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", config.DefaultHTTPTimeout, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 }
 
-func newAppContext(opts config.GenerateOptions) config.AppContext {
-	timeout := opts.HTTPTimeout
-	if timeout == 0 {
-		timeout = config.DefaultHTTPTimeout
-	}
-	return config.AppContext{
-		Options:    opts,
-		HTTPClient: httpkit.New(timeout, httpkit.WithMaxRetries(3)),
-	}
-}
-
 // generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
 func generateCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	appCtx := newAppContext(opts)
+	appCtx := config.NewAppContext(opts)
 	err := pipeline.Execute(ctx, appCtx)
 	if err != nil {
 		return err

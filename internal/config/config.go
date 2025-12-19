@@ -31,3 +31,15 @@ type AppContext struct {
 	Options    GenerateOptions
 	HTTPClient httpkit.ClientInterface
 }
+
+// NewAppContext は、AppContext のインスタンスを返します。
+func NewAppContext(opts GenerateOptions) AppContext {
+	timeout := opts.HTTPTimeout
+	if timeout == 0 {
+		timeout = DefaultHTTPTimeout
+	}
+	return AppContext{
+		Options:    opts,
+		HTTPClient: httpkit.New(timeout, httpkit.WithMaxRetries(3)),
+	}
+}
