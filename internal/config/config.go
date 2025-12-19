@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"time"
 
 	"github.com/shouni/go-http-kit/pkg/httpkit"
@@ -32,7 +33,9 @@ type AppContext struct {
 	HTTPClient httpkit.ClientInterface
 }
 
-// NewAppContext は、AppContext のインスタンスを返します。
+// NewAppContext は、与えられたGenerateOptionsからアプリケーションの実行に必要な
+// 依存関係（HTTPクライアントなど）を初期化し、AppContextを生成します。
+// この関数は、アプリケーションのライフサイクルで一度だけ呼び出されることを想定しています。
 func NewAppContext(opts GenerateOptions) AppContext {
 	timeout := opts.HTTPTimeout
 	if timeout == 0 {
@@ -42,4 +45,12 @@ func NewAppContext(opts GenerateOptions) AppContext {
 		Options:    opts,
 		HTTPClient: httpkit.New(timeout, httpkit.WithMaxRetries(3)),
 	}
+}
+
+func (ac AppContext) Validate() error {
+	if ac.HTTPClient == nil {
+		return errors.New("HTTPClientが初期化されていません")
+	}
+	// 他の必須フィールドの検証もここに追加可能
+	return nil
 }

@@ -14,6 +14,9 @@ func Execute(
 	ctx context.Context,
 	appCtx config.AppContext,
 ) error {
+	if err := appCtx.Validate(); err != nil {
+		return fmt.Errorf("AppContextの検証に失敗しました: %w", err)
+	}
 	generatedScript, err := generate(ctx, appCtx)
 	if err != nil {
 		return err
