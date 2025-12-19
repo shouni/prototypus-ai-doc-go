@@ -24,5 +24,10 @@ type GenerateOptions struct {
 	ScriptFile     string
 	AIModel        string
 	HTTPTimeout    time.Duration
-	HTTPClient     httpkit.ClientInterface
+}
+
+// AppContext は実行時の依存関係を保持するコンテナ
+type AppContext struct {
+	Options    GenerateOptions
+	HTTPClient httpkit.ClientInterface
 }

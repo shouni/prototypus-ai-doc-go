@@ -39,9 +39,12 @@ func generateCommand(cmd *cobra.Command, args []string) error {
 	if timeout == 0 {
 		timeout = config.DefaultHTTPTimeout
 	}
-	opts.HTTPClient = httpkit.New(timeout, httpkit.WithMaxRetries(3))
 
-	err := pipeline.Execute(ctx, opts)
+	appCtx := config.AppContext{
+		HTTPClient: httpkit.New(timeout, httpkit.WithMaxRetries(3)),
+	}
+
+	err := pipeline.Execute(ctx, appCtx)
 	if err != nil {
 		return err
 	}

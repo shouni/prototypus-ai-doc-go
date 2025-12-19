@@ -69,8 +69,13 @@ func initializeVoicevoxExecutor(ctx context.Context, httpClient httpkit.ClientIn
 
 // BuildGenerateRunner は、必要な依存関係をすべて構築し、
 // 実行可能な GenerateRunner のインスタンスを返します。
-func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runner.GenerateRunner, error) {
-	extractor, err := extract.NewExtractor(opts.HTTPClient)
+func BuildGenerateRunner(ctx context.Context, appContext config.AppContext) (runner.GenerateRunner, error) {
+	if appContext.HTTPClient == nil {
+		return nil, errors.New("AppContext 内の HTTPClient が初期化されていません。")
+	}
+
+	opts := appContext.Options
+	extractor, err := extract.NewExtractor(appContext.HTTPClient)
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
@@ -104,14 +109,19 @@ func BuildGenerateRunner(ctx context.Context, opts config.GenerateOptions) (runn
 
 // BuildPublisherRunner は、必要な依存関係をすべて構築し、
 // 実行可能な PublisherRunner のインスタンスを返します。
-func BuildPublisherRunner(ctx context.Context, opts config.GenerateOptions) (runner.PublisherRunner, error) {
+func BuildPublisherRunner(ctx context.Context, appContext config.AppContext) (runner.PublisherRunner, error) {
+	if appContext.HTTPClient == nil {
+		return nil, errors.New("AppContext 内の HTTPClient が初期化されていません。")
+	}
+
+	opts := appContext.Options
 	writer, err := initializeOutputWriter(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// VOICEVOX エンジンパイプラインの初期化
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, opts.HTTPClient, writer, opts.VoicevoxOutput)
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appContext.HTTPClient, writer, opts.VoicevoxOutput)
 	if err != nil {
 		return nil, err
 	}
