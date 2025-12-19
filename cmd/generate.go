@@ -31,7 +31,6 @@ func init() {
 	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", config.DefaultHTTPTimeout, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 }
 
-// cmd/generate.go または別の初期化用パッケージに以下のような関数を定義
 func newAppContext(opts config.GenerateOptions) config.AppContext {
 	timeout := opts.HTTPTimeout
 	if timeout == 0 {

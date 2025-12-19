@@ -43,7 +43,7 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 func initializeOutputWriter(ctx context.Context) (remoteio.OutputWriter, error) {
 	gcsFactory, err := gcsfactory.NewGCSClientFactory(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("GCSファクトリの初期化に失敗しました: %w", err)
+		return nil, fmt.Errorf("GCSクライアントファクトリの初期化に失敗しました: %w", err)
 	}
 	writer, err := gcsFactory.NewOutputWriter()
 	if err != nil {
