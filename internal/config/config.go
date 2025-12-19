@@ -2,6 +2,8 @@ package config
 
 import (
 	"time"
+
+	"github.com/shouni/go-http-kit/pkg/httpkit"
 )
 
 // DefaultHTTPTimeout はHTTPリクエストのデフォルトタイムアウトを定義します。
@@ -22,4 +24,5 @@ type GenerateOptions struct {
 	ScriptFile     string
 	AIModel        string
 	HTTPTimeout    time.Duration
+	HTTPClient     httpkit.ClientInterface
 }

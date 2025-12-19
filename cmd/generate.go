@@ -4,6 +4,7 @@ import (
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/pipeline"
 
+	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/spf13/cobra"
 )
 
@@ -33,6 +34,9 @@ func init() {
 // generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
 func generateCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+	// HTTPクライアントの初期化
+	opts.HTTPClient = httpkit.New(opts.HTTPTimeout)
+
 	err := pipeline.Execute(ctx, opts)
 	if err != nil {
 		return err
