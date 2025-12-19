@@ -41,6 +41,7 @@ func generateCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	appCtx := config.AppContext{
+		Options:    opts,
 		HTTPClient: httpkit.New(timeout, httpkit.WithMaxRetries(3)),
 	}
 
