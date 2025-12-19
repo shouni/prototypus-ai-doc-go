@@ -31,20 +31,22 @@ func init() {
 	generateCmd.Flags().DurationVar(&opts.HTTPTimeout, "http-timeout", config.DefaultHTTPTimeout, "Webリクエストのタイムアウト時間 (例: 15s, 1m)。")
 }
 
-// generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
-func generateCommand(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-	// HTTPクライアントの初期化
+// cmd/generate.go または別の初期化用パッケージに以下のような関数を定義
+func newAppContext(opts config.GenerateOptions) config.AppContext {
 	timeout := opts.HTTPTimeout
 	if timeout == 0 {
 		timeout = config.DefaultHTTPTimeout
 	}
-
-	appCtx := config.AppContext{
+	return config.AppContext{
 		Options:    opts,
 		HTTPClient: httpkit.New(timeout, httpkit.WithMaxRetries(3)),
 	}
+}
 
+// generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
+func generateCommand(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	appCtx := newAppContext(opts)
 	err := pipeline.Execute(ctx, appCtx)
 	if err != nil {
 		return err

@@ -35,12 +35,12 @@ func generate(
 	ctx context.Context,
 	appCtx config.AppContext,
 ) (string, error) {
-	runner, err := builder.BuildGenerateRunner(ctx, appCtx)
+	generateRunner, err := builder.BuildGenerateRunner(ctx, appCtx)
 	if err != nil {
 		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す
 		return "", fmt.Errorf("生成実行器の構築に失敗しました: %w", err)
 	}
-	generatedScript, err := runner.Run(ctx)
+	generatedScript, err := generateRunner.Run(ctx)
 	if err != nil {
 		return "", fmt.Errorf("スクリプトテキスト作成に失敗しました: %w", err)
 	}
@@ -54,11 +54,11 @@ func publish(
 	appCtx config.AppContext,
 	scriptContent string,
 ) error {
-	runner, err := builder.BuildPublisherRunner(ctx, appCtx)
+	publishRunner, err := builder.BuildPublisherRunner(ctx, appCtx)
 	if err != nil {
 		return fmt.Errorf("PublishRunnerの構築に失敗しました: %w", err)
 	}
-	err = runner.Run(ctx, scriptContent)
+	err = publishRunner.Run(ctx, scriptContent)
 	if err != nil {
 		return fmt.Errorf("公開処理の実行に失敗しました: %w", err)
 	}
