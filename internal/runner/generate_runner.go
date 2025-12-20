@@ -105,14 +105,23 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 		path := gr.options.ScriptFile
 		rc, openErr := gr.reader.Open(ctx, path)
 		if openErr != nil {
-			return nil, fmt.Errorf("入力ソースのオープンに失敗しました (%s): %w", path, openErr)
+			return nil, fmt.Errorf("failed to open input source (%s): %w", path, openErr)
 		}
 
-		defer func() {
-			if closeErr := rc.Close(); closeErr != nil {
-				err = errors.Join(err, fmt.Errorf("入力ソースのクローズに失敗 (%s): %w", path, closeErr))
-			}
-		}()
+		inputContent, err = io.ReadAll(rc)
+		closeErr := rc.Close()
+
+		// 読み込みエラーを最優先で処理する
+		if err != nil {
+			// クローズエラーも発生していた場合は、両方の情報を結合して返す
+			combinedErr := errors.Join(err, closeErr)
+			return nil, fmt.Errorf("failed to read from input source (%s): %w", path, combinedErr)
+		}
+
+		// 読み込みが成功していても、リソースのクローズに失敗した場合はエラーとして扱う
+		if closeErr != nil {
+			return nil, fmt.Errorf("failed to close input source (%s): %w", path, closeErr)
+		}
 
 		inputContent, err = io.ReadAll(rc)
 	}
