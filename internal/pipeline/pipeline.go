@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -22,6 +23,13 @@ func Execute(
 	if err := appCtx.Validate(); err != nil {
 		return fmt.Errorf("AppContextの検証に失敗しました: %w", err)
 	}
+	defer func() {
+		if closeErr := appCtx.Close(); closeErr != nil {
+			// メインのエラーとクローズエラーを結合して返す
+			err = errors.Join(err, closeErr)
+		}
+	}()
+
 	generatedScript, err := generate(ctx, appCtx)
 	if err != nil {
 		return err
