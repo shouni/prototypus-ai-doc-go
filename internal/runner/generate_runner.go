@@ -52,7 +52,7 @@ func NewDefaultGenerateRunner(
 	}
 }
 
-// Run はナレーションスクリプト生成します。
+// Run は、入力ソースからコンテンツを読み込み、AIモデルを使用してナレーションスクリプトを生成する一連の処理を実行します。
 func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 	inputContent, err := gr.readInputContent(ctx)
 	if err != nil {
