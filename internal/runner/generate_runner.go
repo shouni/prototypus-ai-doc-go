@@ -103,33 +103,28 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 		inputContent, err = gr.readFromURL(ctx)
 	default:
 		// URLが指定されていない場合、--script-fileで指定されたパスからコンテンツを読み込む。
-		// パスが空文字列または"-"の場合、remoteio.InputReaderによって標準入力がソースとして扱われる。
+		// パスが空文字列または"-"の場合、標準入力がソースとなる。
 		path := gr.options.ScriptFile
 		rc, openErr := gr.reader.Open(ctx, path)
 		if openErr != nil {
-			return nil, fmt.Errorf("failed to open input source (%s): %w", path, openErr)
+			return nil, fmt.Errorf("入力ソースのオープンに失敗しました (%s): %w", path, openErr)
 		}
 
-		// 読み込み実行
-		inputContent, err = io.ReadAll(rc)
-		// 読み取り直後にクローズ
+		// 読み取りとクローズを同時に行い、エラーを結合
+		readContent, readErr := io.ReadAll(rc)
 		closeErr := rc.Close()
 
-		//  読み込みエラーが発生していた場合の処理
-		if err != nil {
-			// クローズエラーも併発している場合は errors.Join で結合
-			return nil, fmt.Errorf("failed to read from input source (%s): %w", path, errors.Join(err, closeErr))
+		if joinedErr := errors.Join(readErr, closeErr); joinedErr != nil {
+			return nil, fmt.Errorf("入力ソース(%s)の処理に失敗しました: %w", path, joinedErr)
 		}
-
-		// 読み込みは成功したがクローズに失敗した場合の処理
-		if closeErr != nil {
-			return nil, fmt.Errorf("failed to close input source (%s): %w", path, closeErr)
-		}
+		inputContent = readContent
 	}
 
-	// 共通のエラーチェック (URL読み込み時のエラー、または標準入力が空の場合)
+	// 共通のエラーチェック (URL読み込みエラー、または標準入力が空の場合の判定)
 	if err != nil {
-		if errors.Is(err, io.EOF) && len(inputContent) == 0 && gr.options.ScriptFile == "" {
+		// --script-file 指定なし、または明示的な "-" 指定の両方をチェック
+		isStdinEmpty := (gr.options.ScriptFile == "" || gr.options.ScriptFile == "-")
+		if errors.Is(err, io.EOF) && len(inputContent) == 0 && isStdinEmpty {
 			return nil, fmt.Errorf("標準入力が空です。文章を入力してください。")
 		}
 		return nil, fmt.Errorf("コンテンツの読み込み中にエラーが発生しました: %w", err)
