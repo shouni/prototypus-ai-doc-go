@@ -21,8 +21,8 @@ import (
 
 type AppContext struct {
 	Options         config.GenerateOptions
-	HTTPClient      httpkit.ClientInterface
-	RemoteIOFactory gcsfactory.Factory
+	httpClient      httpkit.ClientInterface
+	remoteIOFactory gcsfactory.Factory
 }
 
 // NewAppContext は、依存関係の起点となる AppContext を生成します。
@@ -39,16 +39,16 @@ func NewAppContext(ctx context.Context, opts config.GenerateOptions) (AppContext
 
 	return AppContext{
 		Options:         opts,
-		HTTPClient:      httpkit.New(timeout, httpkit.WithMaxRetries(3)),
-		RemoteIOFactory: remoteIOFactory,
+		httpClient:      httpkit.New(timeout, httpkit.WithMaxRetries(3)),
+		remoteIOFactory: remoteIOFactory,
 	}, nil
 }
 
 // Close は、クライアント接続を安全にクローズします。
 func (ac AppContext) Close() error {
 	var multiErr error
-	if ac.RemoteIOFactory != nil {
-		if err := ac.RemoteIOFactory.Close(); err != nil {
+	if ac.remoteIOFactory != nil {
+		if err := ac.remoteIOFactory.Close(); err != nil {
 			multiErr = errors.Join(multiErr, fmt.Errorf("GCS Factoryのクローズに失敗: %w", err))
 		}
 	}
@@ -58,10 +58,10 @@ func (ac AppContext) Close() error {
 
 // Validate は、AppContextの必須フィールドがすべて正しく初期化されていることを検証します。
 func (ac AppContext) Validate() error {
-	if ac.HTTPClient == nil {
+	if ac.httpClient == nil {
 		return errors.New("HTTPClientが初期化されていません")
 	}
-	if ac.RemoteIOFactory == nil {
+	if ac.remoteIOFactory == nil {
 		return errors.New("GCSFactoryが初期化されていません")
 	}
 	return nil
@@ -70,11 +70,11 @@ func (ac AppContext) Validate() error {
 // BuildGenerateRunner は、GenerateRunner のインスタンスを返します。
 func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.GenerateRunner, error) {
 	opts := appCtx.Options
-	extractor, err := extract.NewExtractor(appCtx.HTTPClient)
+	extractor, err := extract.NewExtractor(appCtx.httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
-	reader, err := appCtx.RemoteIOFactory.NewInputReader()
+	reader, err := appCtx.remoteIOFactory.NewInputReader()
 	if err != nil {
 		return nil, fmt.Errorf("入力リーダの初期化に失敗しました: %w", err)
 	}
@@ -105,12 +105,12 @@ func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.Generat
 // BuildPublisherRunner は、PublisherRunner のインスタンスを返します。
 func BuildPublisherRunner(ctx context.Context, appCtx AppContext) (runner.PublisherRunner, error) {
 	opts := appCtx.Options
-	writer, err := appCtx.RemoteIOFactory.NewOutputWriter()
+	writer, err := appCtx.remoteIOFactory.NewOutputWriter()
 	if err != nil {
 		return nil, fmt.Errorf("出力ライターの初期化に失敗しました: %w", err)
 	}
 
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.HTTPClient, writer, opts.VoicevoxOutput)
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.httpClient, writer, opts.VoicevoxOutput)
 	if err != nil {
 		return nil, err
 	}
