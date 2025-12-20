@@ -102,9 +102,6 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 	case gr.options.ScriptURL != "":
 		inputContent, err = gr.readFromURL(ctx)
 	default:
-		// ScriptFile が空の場合は標準入力として扱うように、
-		// UniversalInputReader は空文字列や特定のパスを処理できる前提です。
-		// もし stdin を明示的に扱いたい場合は path に "-" を渡す等のルールを運用します。
 		path := gr.options.ScriptFile
 
 		// クラウド/ローカル両対応の Reader を使用
@@ -112,7 +109,12 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 		if openErr != nil {
 			return nil, fmt.Errorf("入力ソースのオープンに失敗しました (%s): %w", path, openErr)
 		}
-		defer rc.Close()
+
+		defer func() {
+			if closeErr := rc.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("入力ソースのクローズに失敗 (%s): %w", path, closeErr))
+			}
+		}()
 
 		inputContent, err = io.ReadAll(rc)
 	}
