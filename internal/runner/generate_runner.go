@@ -12,7 +12,7 @@ import (
 	"prototypus-ai-doc-go/internal/prompt"
 
 	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
-	"github.com/shouni/go-utils/iohandler"
+	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
@@ -32,6 +32,7 @@ type DefaultGenerateRunner struct {
 	extractor     *extract.Extractor
 	promptBuilder promptBuilder
 	aiClient      *gemini.Client
+	reader        remoteio.InputReader
 }
 
 // NewDefaultGenerateRunner は、依存関係を注入して DefaultGenerateRunner の新しいインスタンスを生成します。
@@ -40,33 +41,32 @@ func NewDefaultGenerateRunner(
 	extractor *extract.Extractor,
 	promptBuilder promptBuilder,
 	aiClient *gemini.Client,
+	reader remoteio.InputReader,
 ) *DefaultGenerateRunner {
 	return &DefaultGenerateRunner{
 		options:       options,
 		extractor:     extractor,
 		promptBuilder: promptBuilder,
 		aiClient:      aiClient,
+		reader:        reader,
 	}
 }
 
-// Run は実行します。
+// Run はナレーションスクリプト生成します。
 func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 	inputContent, err := gr.readInputContent(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	// ログ出力
 	slog.Info("処理開始", "mode", gr.options.Mode, "model", gr.options.AIModel, "input_size", len(inputContent))
 	slog.Info("AIによるスクリプト生成を開始します...")
 
-	// プロンプトの構築
 	promptContent, err := gr.buildFullPrompt(string(inputContent))
 	if err != nil {
 		return "", err
 	}
 
-	// AIによるスクリプト生成
 	generatedResponse, err := gr.aiClient.GenerateContent(ctx, promptContent, gr.options.AIModel)
 	if err != nil {
 		return "", fmt.Errorf("スクリプト生成に失敗しました: %w", err)
@@ -80,7 +80,6 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 // ヘルパー関数 (入力処理)
 // --------------------------------------------------------------------------------
 
-// readFromURL はURLからコンテンツを取得します。
 func (gr *DefaultGenerateRunner) readFromURL(ctx context.Context) ([]byte, error) {
 	slog.Info("URLからコンテンツを取得中", "url", gr.options.ScriptURL, "timeout", gr.options.HTTPTimeout.String())
 
@@ -96,29 +95,33 @@ func (gr *DefaultGenerateRunner) readFromURL(ctx context.Context) ([]byte, error
 
 // readInputContent は入力ソースからコンテンツを読み込みます。
 func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, error) {
-	// 早期リターン条件チェックの強化: VOICEVOX出力時はOutputFileは不要
-	if gr.options.VoicevoxOutput != "" && gr.options.OutputFile != "" {
-		return nil, fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
-	}
-
 	var inputContent []byte
 	var err error
 
 	switch {
 	case gr.options.ScriptURL != "":
 		inputContent, err = gr.readFromURL(ctx)
-	case gr.options.ScriptFile != "":
-		inputContent, err = iohandler.ReadInput(gr.options.ScriptFile)
 	default:
-		inputContent, err = iohandler.ReadInput("")
+		// ScriptFile が空の場合は標準入力として扱うように、
+		// UniversalInputReader は空文字列や特定のパスを処理できる前提です。
+		// もし stdin を明示的に扱いたい場合は path に "-" を渡す等のルールを運用します。
+		path := gr.options.ScriptFile
+
+		// クラウド/ローカル両対応の Reader を使用
+		rc, openErr := gr.reader.Open(ctx, path)
+		if openErr != nil {
+			return nil, fmt.Errorf("入力ソースのオープンに失敗しました (%s): %w", path, openErr)
+		}
+		defer rc.Close()
+
+		inputContent, err = io.ReadAll(rc)
 	}
 
 	if err != nil {
-		// iohandler からの標準入力 EOF エラーをより親切なメッセージに変換
 		if errors.Is(err, io.EOF) && len(inputContent) == 0 && gr.options.ScriptFile == "" {
 			return nil, fmt.Errorf("標準入力が空です。文章を入力してください。")
 		}
-		return nil, err
+		return nil, fmt.Errorf("コンテンツの読み込み中にエラーが発生しました: %w", err)
 	}
 
 	trimmedContent := strings.TrimSpace(string(inputContent))
@@ -126,11 +129,9 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 		return nil, fmt.Errorf("入力されたコンテンツが短すぎます (最低%dバイト必要です)。", config.MinInputContentLength)
 	}
 
-	// TrimSpace後のバイト配列を返す
 	return []byte(trimmedContent), nil
 }
 
-// buildFullPrompt はプロンプトテンプレートを構築し、入力内容を埋め込みます。
 func (gr *DefaultGenerateRunner) buildFullPrompt(inputText string) (string, error) {
 	data := prompt.TemplateData{InputText: inputText}
 	fullPromptString, err := gr.promptBuilder.Build(data)

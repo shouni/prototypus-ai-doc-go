@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/pipeline"
 
@@ -33,6 +34,12 @@ func init() {
 // generateCommand は、AIによるナレーションスクリプトを生成し、指定されたURIのクラウドストレージにWAVをアップロード
 func generateCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	// 制約チェック
+	if opts.VoicevoxOutput != "" && opts.OutputFile != "" {
+		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
+	}
+
 	err := pipeline.Execute(ctx, opts)
 	if err != nil {
 		return err

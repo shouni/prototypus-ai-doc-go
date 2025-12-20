@@ -44,6 +44,19 @@ func NewAppContext(ctx context.Context, opts config.GenerateOptions) (AppContext
 	}, nil
 }
 
+// Close は、クライアント接続を安全にクローズします。
+func (ac AppContext) Close() error {
+	var multiErr error
+	if ac.GCSFactory != nil {
+		if err := ac.GCSFactory.Close(); err != nil {
+			multiErr = fmt.Errorf("GCS Factoryのクローズに失敗: %w; %v", err, multiErr)
+		}
+	}
+
+	return multiErr
+}
+
+// Validate は、AppContext のValidateをします。
 func (ac AppContext) Validate() error {
 	if ac.HTTPClient == nil {
 		return errors.New("HTTPClientが初期化されていません")
@@ -60,6 +73,10 @@ func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.Generat
 	extractor, err := extract.NewExtractor(appCtx.HTTPClient)
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
+	}
+	reader, err := appCtx.GCSFactory.NewInputReader()
+	if err != nil {
+		return nil, fmt.Errorf("入力リーダの初期化に失敗しました: %w", err)
 	}
 
 	templateStr, err := prompt.GetPromptByMode(opts.Mode)
@@ -81,6 +98,7 @@ func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.Generat
 		extractor,
 		promptBuilder,
 		aiClient,
+		reader,
 	), nil
 }
 

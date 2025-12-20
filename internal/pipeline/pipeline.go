@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"prototypus-ai-doc-go/internal/builder"
@@ -22,6 +23,12 @@ func Execute(
 	if err := appCtx.Validate(); err != nil {
 		return fmt.Errorf("AppContextの検証に失敗しました: %w", err)
 	}
+	defer func() {
+		if closeErr := appCtx.Close(); closeErr != nil {
+			slog.Error("依存関係のクローズに失敗", "error", closeErr)
+		}
+	}()
+
 	generatedScript, err := generate(ctx, appCtx)
 	if err != nil {
 		return err
