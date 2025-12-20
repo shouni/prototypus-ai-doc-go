@@ -34,7 +34,6 @@ func NewAppContext(ctx context.Context, opts config.GenerateOptions) (AppContext
 
 	gcsFactory, err := gcsfactory.NewGCSClientFactory(ctx)
 	if err != nil {
-		// 修正: 戻り値の型を (AppContext, error) にし、エラー時は空の構造体を返す
 		return AppContext{}, fmt.Errorf("リモートストレージのクライアントファクトリ初期化に失敗しました: %w", err)
 	}
 
@@ -125,13 +124,13 @@ func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化します。
 func initializeVoicevoxExecutor(ctx context.Context, httpClient httpkit.ClientInterface, writer remoteio.OutputWriter, voicevoxOutput string) (voicevox.EngineExecutor, error) {
 	if voicevoxOutput == "" {
-		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼギュータをスキップします。")
+		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
 		return nil, nil
 	}
 
 	executor, err := voicevox.NewEngineExecutor(ctx, httpClient, writer, true)
 	if err != nil {
-		return nil, fmt.Errorf("VOICEVOXエンジンエクゼギュータの初期化に失敗しました: %w", err)
+		return nil, fmt.Errorf("VOICEVOXエンジンエクゼキュータの初期化に失敗しました: %w", err)
 	}
 	return executor, nil
 }

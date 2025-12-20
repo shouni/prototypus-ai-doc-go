@@ -45,8 +45,7 @@ func generate(
 ) (string, error) {
 	generateRunner, err := builder.BuildGenerateRunner(ctx, appCtx)
 	if err != nil {
-		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す
-		return "", fmt.Errorf("GenerateRunnerの構築に失敗しました: %w", err)
+		return "", fmt.Errorf("生成ランナーの構築に失敗しました: %w", err)
 	}
 	generatedScript, err := generateRunner.Run(ctx)
 	if err != nil {
@@ -64,7 +63,7 @@ func publish(
 ) error {
 	publishRunner, err := builder.BuildPublisherRunner(ctx, appCtx)
 	if err != nil {
-		return fmt.Errorf("PublishRunnerの構築に失敗しました: %w", err)
+		return fmt.Errorf("公開ランナーの構築に失敗しました: %w", err)
 	}
 	err = publishRunner.Run(ctx, scriptContent)
 	if err != nil {
