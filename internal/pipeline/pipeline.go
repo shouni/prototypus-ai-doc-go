@@ -12,8 +12,13 @@ import (
 // Execute は、すべての依存関係を構築し実行します。
 func Execute(
 	ctx context.Context,
-	appCtx config.AppContext,
+	opts config.GenerateOptions,
 ) error {
+	appCtx, err := builder.NewAppContext(ctx, opts)
+	if err != nil {
+		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す
+		return fmt.Errorf("AppContextの構築に失敗しました: %w", err)
+	}
 	if err := appCtx.Validate(); err != nil {
 		return fmt.Errorf("AppContextの検証に失敗しました: %w", err)
 	}
@@ -36,12 +41,12 @@ func Execute(
 // 実行結果の文字列とエラーを返します。
 func generate(
 	ctx context.Context,
-	appCtx config.AppContext,
+	appCtx builder.AppContext,
 ) (string, error) {
 	generateRunner, err := builder.BuildGenerateRunner(ctx, appCtx)
 	if err != nil {
 		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す
-		return "", fmt.Errorf("生成実行器の構築に失敗しました: %w", err)
+		return "", fmt.Errorf("GenerateRunnerの構築に失敗しました: %w", err)
 	}
 	generatedScript, err := generateRunner.Run(ctx)
 	if err != nil {
@@ -54,7 +59,7 @@ func generate(
 // publish は、すべての依存関係を構築し、パブリッシュパイプラインを実行します。
 func publish(
 	ctx context.Context,
-	appCtx config.AppContext,
+	appCtx builder.AppContext,
 	scriptContent string,
 ) error {
 	publishRunner, err := builder.BuildPublisherRunner(ctx, appCtx)
