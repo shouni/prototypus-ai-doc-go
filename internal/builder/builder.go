@@ -49,7 +49,7 @@ func (ac AppContext) Close() error {
 	var multiErr error
 	if ac.GCSFactory != nil {
 		if err := ac.GCSFactory.Close(); err != nil {
-			multiErr = fmt.Errorf("GCS Factoryのクローズに失敗: %w; %v", err, multiErr)
+			multiErr = errors.Join(multiErr, fmt.Errorf("GCS Factoryのクローズに失敗: %w", err))
 		}
 	}
 

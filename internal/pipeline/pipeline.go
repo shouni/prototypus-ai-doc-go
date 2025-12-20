@@ -2,8 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"prototypus-ai-doc-go/internal/builder"
@@ -25,7 +25,8 @@ func Execute(
 	}
 	defer func() {
 		if closeErr := appCtx.Close(); closeErr != nil {
-			slog.Error("依存関係のクローズに失敗", "error", closeErr)
+			// メインのエラーとクローズエラーを結合して返す
+			err = errors.Join(err, closeErr)
 		}
 	}()
 
