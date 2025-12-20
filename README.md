@@ -178,6 +178,27 @@ VOICEVOXエンジンとGCS認証（`GOOGLE_APPLICATION_CREDENTIALS`）が設定�
 
 -----
 
+### ⚖️ クレジット表記 (Credits)
+
+本プロジェクトを利用して音声を生成・公開する際は、以下のソフトウェアおよびキャラクターのライセンス・利用規約に従ってください。
+
+### ソフトウェア
+
+* **VOICEVOX**: [https://voicevox.hiroshiba.jp/](https://voicevox.hiroshiba.jp/)
+
+### キャラクター
+
+本プロジェクトのデフォルト設定やプロンプト例では、以下のキャラクターを利用しています。
+
+* **VOICEVOX:ずんだもん**
+* **VOICEVOX:四国めたん**
+
+> **利用規約の遵守について**
+> 音声を使用する際は、[VOICEVOX 利用規約](https://voicevox.hiroshiba.jp/term/)および、各キャラクターの利用規約（[ずんだもん・四国めたん 利用規約](https://zunko.jp/con_ongen_kiyaku.html)）を必ず確認し、適切なクレジット表記を行ってください。
+> 例：`VOICEVOX:ずんだもん`、`VOICEVOX:四国めたん`
+
+-----
+
 ### 📜 ライセンス (License)
 
 このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
