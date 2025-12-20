@@ -99,51 +99,31 @@ paidgo generate [flags]
 
 ## 🔊 実行例
 
-### 例 1: Web記事を対話スクリプト化し、GCSに音声ファイルを出力（タイムアウト指定あり）
-
-VOICEVOXエンジンとGCS認証（`GOOGLE_APPLICATION_CREDENTIALS`）が設定済みであることを前提とします。
+### 例 1: Web記事を対話形式で音声化し、GCSへ保存
 
 ```bash
-# Web上の技術記事を読み込み、対話モードでスクリプト生成、生成されたWAVをGCSに直接アップロード
 ./bin/paidgo generate \
-    --script-url "https://github.com/shouni/prototypus-ai-doc-go" \
+    --script-url "https://example.com/tech-news" \
     --mode dialogue \
-    --http-timeout 280s \
-    --voicevox gs://my-audio-bucket/docs/out_dialogue_20251116.wav
+    --voicevox "gs://my-audio-bucket/news.wav"
+
 ```
 
-### 例 2: ローカルファイルをモノローグ化し、結果を画面に出力
+### 例 2: S3上の文書をモノローグ化し、結果を画面に出力
 
 ```bash
-# README.md の内容を元にモノローグスクリプトを生成し、標準出力に表示
 ./bin/paidgo generate \
-    --script-file README.md \
-    --mode solo \
-    --output-file -  # 標準出力への明示的な指定 (省略可能)
+    --script-file "s3://my-bucket/manual.md" \
+    --mode solo
+
 ```
 
------
+---
 
 ### ⚖️ クレジット表記 (Credits)
 
-本プロジェクトを利用して音声を生成・公開する際は、以下のソフトウェアおよびキャラクターのライセンス・利用規約に従ってください。
-
-### ソフトウェア
-
 * **VOICEVOX**: [https://voicevox.hiroshiba.jp/](https://voicevox.hiroshiba.jp/)
-
-### キャラクター
-
-本プロジェクトのデフォルト設定やプロンプト例では、以下のキャラクターを利用しています。
-
-* **VOICEVOX:ずんだもん**
-* **VOICEVOX:四国めたん**
-
-> **利用規約の遵守について**
-> 音声を使用する際は、[VOICEVOX 利用規約](https://voicevox.hiroshiba.jp/term/)および、各キャラクターの利用規約（[ずんだもん・四国めたん 利用規約](https://zunko.jp/con_ongen_kiyaku.html)）を必ず確認し、適切なクレジット表記を行ってください。
-> 例：`VOICEVOX:ずんだもん`、`VOICEVOX:四国めたん`
-
------
+* **デフォルトキャラクター**: VOICEVOX:ずんだもん、VOICEVOX:四国めたん
 
 ### 📜 ライセンス (License)
 
