@@ -37,7 +37,7 @@ func generateCommand(cmd *cobra.Command, args []string) error {
 
 	// 制約チェック
 	if cmd.Flags().Changed("voicevox") && cmd.Flags().Changed("output-file") {
-		return fmt.Errorf("voicevox出力(-v)とファイル出力(-o)は同時に指定できません。どちらか一方のみ指定してください")
+		return fmt.Errorf("--voicevoxオプションと--output-fileオプションは同時に指定できません")
 	}
 
 	err := pipeline.Execute(ctx, opts)

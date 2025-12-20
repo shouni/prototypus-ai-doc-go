@@ -103,8 +103,6 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 		inputContent, err = gr.readFromURL(ctx)
 	default:
 		path := gr.options.ScriptFile
-
-		// クラウド/ローカル両対応の Reader を使用
 		rc, openErr := gr.reader.Open(ctx, path)
 		if openErr != nil {
 			return nil, fmt.Errorf("入力ソースのオープンに失敗しました (%s): %w", path, openErr)
