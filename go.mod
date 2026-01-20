@@ -6,9 +6,9 @@ require (
 	github.com/shouni/go-cli-base v1.0.5
 	github.com/shouni/go-gemini-client v1.0.3
 	github.com/shouni/go-http-kit v1.1.2
-	github.com/shouni/go-remote-io v1.1.2
+	github.com/shouni/go-remote-io v1.2.0
 	github.com/shouni/go-utils v1.0.16
-	github.com/shouni/go-voicevox v1.1.12
+	github.com/shouni/go-voicevox v1.1.13
 	github.com/shouni/go-web-exact/v2 v2.0.13
 	github.com/spf13/cobra v1.10.2
 )

@@ -114,12 +114,12 @@ github.com/shouni/go-gemini-client v1.0.3 h1:30aeRSnI76+jlp3vW6MbHh1rWkUJne0hqbm
 github.com/shouni/go-gemini-client v1.0.3/go.mod h1:DMuaUXihLfCFR3UXjN1TPhdzlw4s06ESLb+xxbS+q5k=
 github.com/shouni/go-http-kit v1.1.2 h1:hVhVSjF1yLt9kMJbI5yFYQvANuHCH3so7ynhCiXbI8Q=
 github.com/shouni/go-http-kit v1.1.2/go.mod h1:CFk1CJbTqRskKB70qbn+q2fVyH9zXNp9KWQuWp/lwFY=
-github.com/shouni/go-remote-io v1.1.2 h1:KdZSXzMgV5ek3f7ca/lUn9y4JlsSo/CYYIcmIxgQnw0=
-github.com/shouni/go-remote-io v1.1.2/go.mod h1:0zVVFnT4jSw42lf/zFZD1TghwX9aTNgAs9+wIXandis=
+github.com/shouni/go-remote-io v1.2.0 h1:2B4QpjuUwC95I3dG2gyr2vwwyXRBB/ZNP9Dhuj05URM=
+github.com/shouni/go-remote-io v1.2.0/go.mod h1:0zVVFnT4jSw42lf/zFZD1TghwX9aTNgAs9+wIXandis=
 github.com/shouni/go-utils v1.0.16 h1:3DYPlS6WbrWcIfJy0HBlTmwEoeikEZR507U4bCWtDxU=
 github.com/shouni/go-utils v1.0.16/go.mod h1:dQxOuVTvWFHWEH/G6izteLh+tubkI5Sl1jpDWlCSkBU=
-github.com/shouni/go-voicevox v1.1.12 h1:NdYq8p9VTMwXmTSklZgyi2IyHyD43rmBLMMnskgKq+M=
-github.com/shouni/go-voicevox v1.1.12/go.mod h1:IyDCMv/WGLZrux1UL65dsSlZ59VXd6hg9OZpVAlY2TE=
+github.com/shouni/go-voicevox v1.1.13 h1:+aUQswfXucMM6F779c1p/f0RAB7IMcL+03W7GH4ECes=
+github.com/shouni/go-voicevox v1.1.13/go.mod h1:K9JKNe8RHo47BNGY3fia+AP8plnhLSIwrzV3FR8fws4=
 github.com/shouni/go-web-exact/v2 v2.0.13 h1:GMwj/0tP96B8VGBQ0yhe8+dYI4lD6ImIC4Kdra1xptM=
 github.com/shouni/go-web-exact/v2 v2.0.13/go.mod h1:j5jU6uCI/AwchJA00nZpY7LnIJ1Vg+KylXCNXknuWdw=
 github.com/spf13/cobra v1.10.2 h1:DMTTonx5m65Ic0GOoRY2c16WCbHxOOw6xxezuLaBpcU=
