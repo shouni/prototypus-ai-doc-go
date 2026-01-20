@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"prototypus-ai-doc-go/internal/config"
 	"strings"
@@ -36,20 +37,25 @@ func NewDefaultPublisherRunner(options config.GenerateOptions, voicevoxExecutor 
 // Run は公開処理のパイプライン全体を実行します。
 func (pr *DefaultPublisherRunner) Run(ctx context.Context, scriptContent string) error {
 	if pr.options.VoicevoxOutput != "" {
-		// 音声合成パイプラインの実行
+		slog.InfoContext(ctx, "VOICEVOXによる音声合成を開始します。", "output_path", pr.options.VoicevoxOutput)
 		err := pr.voicevoxExecutor.Execute(ctx, scriptContent, pr.options.VoicevoxOutput)
 		if err != nil {
 			return fmt.Errorf("音声合成パイプラインの実行に失敗しました: %w", err)
 		}
+		slog.InfoContext(ctx, "音声合成が完了しました。", "output_path", pr.options.VoicevoxOutput)
 
 		// スクリプトのアップロード
 		ext := filepath.Ext(pr.options.VoicevoxOutput)
 		txtPath := strings.TrimSuffix(pr.options.VoicevoxOutput, ext) + ".txt"
 		contentReader := strings.NewReader(scriptContent)
 
+		slog.InfoContext(ctx, "スクリプトのアップロードを開始します。", "upload_path", txtPath)
 		if err := pr.writer.Write(ctx, txtPath, contentReader, "text/plain"); err != nil {
 			return fmt.Errorf("スクリプトのアップロードに失敗しました (%s): %w", txtPath, err)
 		}
+		slog.InfoContext(ctx, "スクリプトのアップロードが完了しました。", "upload_path", txtPath)
+
+		return nil // ローカルファイルへの出力をスキップ
 	}
 
 	return iohandler.WriteOutputString(pr.options.OutputFile, scriptContent)
