@@ -7,7 +7,7 @@
 
 ## 💡 概要 (About)— **堅牢なGo並列処理とAIを統合した次世代ドキュメント音声化パイプライン**
 
-**Prototypus AI Doc Go (PAID Go)** は、独自の **Gemini API クライアントライブラリ** [`shouni/go-ai-client`](https://github.com/shouni/go-ai-client) と **Go言語の強力な並列制御**を融合させた、**業界最高水準の堅牢性**を持つ高生産性 CLI ツールです。
+**Prototypus AI Doc Go (PAID Go)** は、独自の **Gemini API クライアントライブラリ** [`shouni/go-gemini-client`](https://github.com/shouni/go-gemini-client) と **Go言語の強力な並列制御**を融合させた、**業界最高水準の堅牢性**を持つ高生産性 CLI ツールです。
 
 長文の技術ドキュメントやWeb記事を、AIが話者とスタイルを明確に指示した**ナレーションスクリプト**に変換するだけでなく、その台本をローカルの **VOICEVOXエンジンに高速接続**し、**最終的な音声ファイル (WAV)** を生成します。
 
@@ -121,6 +121,14 @@ paidgo generate [flags]
     --voicevox "article.wav"
 
 ```
+
+---
+
+## 🤝 依存関係 (Dependencies)
+
+* [shouni/go-gemini-client](https://github.com/shouni/go-gemini-client) - Gemini API 通信の抽象化と生成ロジックの最適化
+* [shouni/go-voicevox](https://github.com/shouni/go-voicevox) - VOICEVOX エンジンとの通信および音声合成の制御
+* [shouni/go-remote-io](https://github.com/shouni/go-remote-io) - ストレージを透過的に扱うマルチストレージ I/O
 
 ---
 

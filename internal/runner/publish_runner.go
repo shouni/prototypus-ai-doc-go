@@ -58,7 +58,7 @@ func (pr *DefaultPublisherRunner) publishAudioAndScript(ctx context.Context, scr
 	contentReader := strings.NewReader(scriptContent)
 
 	slog.InfoContext(ctx, "スクリプトのアップロードを開始します。", "upload_path", txtPath)
-	if err := pr.writer.Write(ctx, txtPath, contentReader, "text/plain"); err != nil {
+	if err := pr.writer.Write(ctx, txtPath, contentReader, "text/plain; charset=utf-8"); err != nil {
 		return fmt.Errorf("スクリプトのアップロードに失敗しました (%s): %w", txtPath, err)
 	}
 	slog.InfoContext(ctx, "スクリプトのアップロードが完了しました。", "upload_path", txtPath)
