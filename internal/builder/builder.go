@@ -10,7 +10,7 @@ import (
 	"prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/runner"
 
-	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
+	"github.com/shouni/go-gemini-client/pkg/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
@@ -24,7 +24,7 @@ func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.Generat
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
-	reader, err := appCtx.remoteIOFactory.NewInputReader()
+	reader, err := appCtx.ioFactory.InputReader()
 	if err != nil {
 		return nil, fmt.Errorf("入力リーダの初期化に失敗しました: %w", err)
 	}
@@ -55,7 +55,7 @@ func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.Generat
 // BuildPublisherRunner は、PublisherRunner のインスタンスを返します。
 func BuildPublisherRunner(ctx context.Context, appCtx AppContext) (runner.PublisherRunner, error) {
 	opts := appCtx.options
-	writer, err := appCtx.remoteIOFactory.NewOutputWriter()
+	writer, err := appCtx.ioFactory.OutputWriter()
 	if err != nil {
 		return nil, fmt.Errorf("出力ライターの初期化に失敗しました: %w", err)
 	}
@@ -68,6 +68,7 @@ func BuildPublisherRunner(ctx context.Context, appCtx AppContext) (runner.Publis
 	return runner.NewDefaultPublisherRunner(
 		opts,
 		voicevoxExecutor,
+		writer,
 	), nil
 }
 

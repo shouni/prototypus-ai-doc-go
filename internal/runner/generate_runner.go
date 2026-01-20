@@ -11,7 +11,8 @@ import (
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/prompt"
 
-	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
+	"github.com/shouni/go-gemini-client/pkg/gemini"
+
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
@@ -67,7 +68,7 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	generatedResponse, err := gr.aiClient.GenerateContent(ctx, promptContent, gr.options.AIModel)
+	generatedResponse, err := gr.aiClient.GenerateContent(ctx, gr.options.AIModel, promptContent)
 	if err != nil {
 		return "", fmt.Errorf("スクリプト生成に失敗しました: %w", err)
 	}
