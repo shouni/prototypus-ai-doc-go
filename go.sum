@@ -110,8 +110,8 @@ github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUc
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/shouni/go-cli-base v1.0.5 h1:Wn09yji6/DIesFwo81/xlzWaJMqZVG07gXoRxMIre4c=
 github.com/shouni/go-cli-base v1.0.5/go.mod h1:8E4ahg7/LC3cG5zSBR4u/s+ugqrXxEsqXVWGbFlE1P8=
-github.com/shouni/go-gemini-client v1.0.3 h1:30aeRSnI76+jlp3vW6MbHh1rWkUJne0hqbmRZCQfUmo=
-github.com/shouni/go-gemini-client v1.0.3/go.mod h1:DMuaUXihLfCFR3UXjN1TPhdzlw4s06ESLb+xxbS+q5k=
+github.com/shouni/go-gemini-client v1.0.4 h1:GnaVR2H6n2IxJsX+Me8StJBhvEEjt874OxLgf/ogFKA=
+github.com/shouni/go-gemini-client v1.0.4/go.mod h1:DMuaUXihLfCFR3UXjN1TPhdzlw4s06ESLb+xxbS+q5k=
 github.com/shouni/go-http-kit v1.1.2 h1:hVhVSjF1yLt9kMJbI5yFYQvANuHCH3so7ynhCiXbI8Q=
 github.com/shouni/go-http-kit v1.1.2/go.mod h1:CFk1CJbTqRskKB70qbn+q2fVyH9zXNp9KWQuWp/lwFY=
 github.com/shouni/go-remote-io v1.2.0 h1:2B4QpjuUwC95I3dG2gyr2vwwyXRBB/ZNP9Dhuj05URM=
