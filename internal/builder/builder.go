@@ -55,14 +55,14 @@ func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.Generat
 // BuildPublisherRunner は、PublisherRunner のインスタンスを返します。
 func BuildPublisherRunner(ctx context.Context, appCtx AppContext) (runner.PublisherRunner, error) {
 	opts := appCtx.options
+	writer, err := appCtx.ioFactory.OutputWriter()
+	if err != nil {
+		return nil, fmt.Errorf("出力ライターの初期化に失敗しました: %w", err)
+	}
+
 	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.httpClient, writer, opts.VoicevoxOutput)
 	if err != nil {
 		return nil, err
-	}
-
-	writer, err := appCtx.ioFactory.OutputWriter()
-	if err != nil {
-		return nil, fmt.Errorf("出力リーダの初期化に失敗しました: %w", err)
 	}
 
 	return runner.NewDefaultPublisherRunner(
