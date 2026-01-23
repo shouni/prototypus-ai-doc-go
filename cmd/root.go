@@ -4,31 +4,34 @@ import (
 	"fmt"
 	"os"
 
-	clibase "github.com/shouni/go-cli-base"
+	"github.com/shouni/clibase"
 	"github.com/spf13/cobra"
 )
 
-// clibase.CustomFlagFunc のシグネチャに一致
-func addAppFlags(rootCmd *cobra.Command) {
+// Execute は、アプリケーションのメインエントリポイントです。
+func Execute() {
+	clibase.Execute(clibase.App{
+		Name:     "prototypus-ai-doc",
+		AddFlags: addAppFlags,
+		PreRunE:  preRunAppE,
+		Commands: []*cobra.Command{
+			generateCmd,
+		},
+	})
 }
 
-// preRunAppE は、アプリケーション固有の実行前チェック（GEMINI_API_KEY）を実行します。
-// clibase.CustomPreRunEFunc のシグネチャに一致
+// addAppFlags は、アプリケーション固有の永続フラグを定義します。
+// clibase により、標準で --verbose (-V) と --config (-C) が提供されています。
+func addAppFlags(rootCmd *cobra.Command) {
+	// 将来的に PAID Go 固有のグローバルフラグが必要になった場合は、ここに記述します。
+}
+
+// preRunAppE は、コマンド実行前に環境変数などの必須チェックを行います。
 func preRunAppE(cmd *cobra.Command, args []string) error {
-	// GEMINI_API_KEY の必須チェック
+	// Gemini API を利用するため、APIキーの存在チェックは必須です。
 	if os.Getenv("GEMINI_API_KEY") == "" {
 		return fmt.Errorf("エラー: 環境変数 GEMINI_API_KEY が設定されていません。Gemini APIの利用には必須です")
 	}
 
 	return nil
-}
-
-// Execute は、アプリケーションのメインエントリポイントです。
-func Execute() {
-	clibase.Execute(
-		"prototypus-ai-doc",
-		addAppFlags,
-		preRunAppE,
-		generateCmd,
-	)
 }
