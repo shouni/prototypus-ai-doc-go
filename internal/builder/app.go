@@ -29,9 +29,16 @@ func NewAppContext(ctx context.Context, opts config.GenerateOptions) (AppContext
 		return AppContext{}, fmt.Errorf("リモートストレージのクライアントファクトリ初期化に失敗しました: %w", err)
 	}
 
+	// 社内APIへのアクセスなど、安全性が保証されている場合は検証をスキップ
+	internalClient := httpkit.New(
+		timeout,
+		httpkit.WithMaxRetries(1),
+		httpkit.WithSkipNetworkValidation(true),
+	)
+
 	return AppContext{
 		options:    opts,
-		httpClient: httpkit.New(timeout, httpkit.WithMaxRetries(3)),
+		httpClient: internalClient,
 		ioFactory:  ioFactory,
 	}, nil
 }
