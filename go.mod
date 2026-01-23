@@ -3,7 +3,7 @@ module prototypus-ai-doc-go
 go 1.25.0
 
 require (
-	github.com/shouni/clibase v1.0.0
+	github.com/shouni/clibase v1.0.2
 	github.com/shouni/go-gemini-client v1.0.4
 	github.com/shouni/go-http-kit v1.1.2
 	github.com/shouni/go-remote-io v1.2.0
