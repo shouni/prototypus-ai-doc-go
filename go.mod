@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/shouni/clibase v1.0.2
 	github.com/shouni/go-gemini-client v1.0.5
-	github.com/shouni/go-http-kit v1.1.3
+	github.com/shouni/go-http-kit v1.2.1
 	github.com/shouni/go-remote-io v1.2.0
 	github.com/shouni/go-utils v1.0.18
 	github.com/shouni/go-voicevox v1.1.13
