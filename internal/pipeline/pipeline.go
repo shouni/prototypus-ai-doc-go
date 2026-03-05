@@ -16,7 +16,7 @@ import (
 func Execute(
 	ctx context.Context,
 	opts *config.GenerateOptions,
-) (err error) {
+) error {
 	if opts == nil {
 		return errors.New("オプションはnilにできません")
 	}
