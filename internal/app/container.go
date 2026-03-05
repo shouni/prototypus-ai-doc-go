@@ -22,7 +22,6 @@ type RemoteIO struct {
 	Factory remoteio.IOFactory
 	Reader  remoteio.InputReader
 	Writer  remoteio.OutputWriter
-	Signer  remoteio.URLSigner
 }
 
 // Close は、RemoteIO が保持する Factory などの内部リソースを解放します。
@@ -38,6 +37,9 @@ func (r *RemoteIO) Close() error {
 
 // Close は、Container が保持するすべての外部接続リソースを安全に解放します。
 func (c *Container) Close() error {
+	if c == nil {
+		return nil
+	}
 	var errs error
 	if c.RemoteIO != nil {
 		if err := c.RemoteIO.Close(); err != nil {

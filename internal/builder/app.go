@@ -12,15 +12,13 @@ import (
 )
 
 // BuildContainer は外部サービスとの接続を確立し、依存関係を組み立てた app.Container を返します。
-func BuildContainer(ctx context.Context, options *config.GenerateOptions) (container *app.Container, err error) {
+func BuildContainer(ctx context.Context, options *config.GenerateOptions) (*app.Container, error) {
 	var resources []io.Closer
 	defer func() {
-		if err != nil {
-			for _, r := range resources {
-				if r != nil {
-					if closeErr := r.Close(); closeErr != nil {
-						slog.Warn("failed to close resource during cleanup", "error", closeErr)
-					}
+		for _, r := range resources {
+			if r != nil {
+				if closeErr := r.Close(); closeErr != nil {
+					slog.Warn("failed to close resource during cleanup", "error", closeErr)
 				}
 			}
 		}

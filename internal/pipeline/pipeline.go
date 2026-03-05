@@ -17,6 +17,9 @@ func Execute(
 	ctx context.Context,
 	opts *config.GenerateOptions,
 ) (err error) {
+	if opts == nil {
+		return errors.New("オプションはnilにできません")
+	}
 	appCtx, err := builder.BuildContainer(ctx, opts)
 	if err != nil {
 		// コンテナの構築エラーをラップして返す
