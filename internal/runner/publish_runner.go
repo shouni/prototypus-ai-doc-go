@@ -14,16 +14,16 @@ import (
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 )
 
-// PublisherRunner は、スクリプトの公開処理を実行する具象構造体です。
-type PublisherRunner struct {
+// PublishRunner は、スクリプトの公開処理を実行する具象構造体です。
+type PublishRunner struct {
 	options          *config.GenerateOptions
 	voicevoxExecutor voicevox.EngineExecutor
 	writer           remoteio.OutputWriter
 }
 
 // NewPublisherRunner は DefaultPublisherRunner の新しいインスタンスを作成します。
-func NewPublisherRunner(options *config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *PublisherRunner {
-	return &PublisherRunner{
+func NewPublisherRunner(options *config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *PublishRunner {
+	return &PublishRunner{
 		options:          options,
 		voicevoxExecutor: voicevoxExecutor,
 		writer:           writer,
@@ -31,7 +31,7 @@ func NewPublisherRunner(options *config.GenerateOptions, voicevoxExecutor voicev
 }
 
 // Run は公開処理のパイプライン全体を実行します。
-func (pr *PublisherRunner) Run(ctx context.Context, scriptContent string) error {
+func (pr *PublishRunner) Run(ctx context.Context, scriptContent string) error {
 	if pr.options.VoicevoxOutput != "" {
 		return pr.publishAudioAndScript(ctx, scriptContent)
 	}
@@ -40,7 +40,7 @@ func (pr *PublisherRunner) Run(ctx context.Context, scriptContent string) error 
 }
 
 // publishAudioAndScript は音声合成とスクリプトのアップロードを実行します。
-func (pr *PublisherRunner) publishAudioAndScript(ctx context.Context, scriptContent string) error {
+func (pr *PublishRunner) publishAudioAndScript(ctx context.Context, scriptContent string) error {
 	slog.InfoContext(ctx, "VOICEVOXによる音声合成を開始します。", "output_path", pr.options.VoicevoxOutput)
 	if err := pr.voicevoxExecutor.Execute(ctx, scriptContent, pr.options.VoicevoxOutput); err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました (%s): %w", pr.options.VoicevoxOutput, err)

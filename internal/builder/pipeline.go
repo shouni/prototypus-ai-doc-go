@@ -26,7 +26,7 @@ func buildPipeline(ctx context.Context, appCtx *app.Container) (domain.Pipeline,
 	if err != nil {
 		return nil, fmt.Errorf("生成ランナーの初期化に失敗しました: %w", err)
 	}
-	publisherRunner, err := buildPublisherRunner(ctx, appCtx)
+	publisherRunner, err := buildPublishRunner(ctx, appCtx)
 	if err != nil {
 		return nil, fmt.Errorf("パブリッシャーランナーの初期化に失敗しました: %w", err)
 	}
@@ -67,8 +67,8 @@ func buildGenerateRunner(ctx context.Context, appCtx *app.Container) (domain.Gen
 	), nil
 }
 
-// buildPublisherRunner は、PublisherRunner のインスタンスを返します。
-func buildPublisherRunner(ctx context.Context, appCtx *app.Container) (domain.PublishRunner, error) {
+// buildPublishRunner は、PublisherRunner のインスタンスを返します。
+func buildPublishRunner(ctx context.Context, appCtx *app.Container) (domain.PublishRunner, error) {
 	opts := appCtx.Options
 	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.HTTPClient, appCtx.RemoteIO.Writer, opts.VoicevoxOutput)
 	if err != nil {
