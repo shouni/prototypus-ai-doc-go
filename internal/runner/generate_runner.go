@@ -12,39 +12,28 @@ import (
 	"prototypus-ai-doc-go/internal/prompt"
 
 	"github.com/shouni/go-gemini-client/pkg/gemini"
-
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
-// promptBuilderインターフェースをrunnerパッケージ内で定義する
-type promptBuilder interface {
-	Build(data prompt.TemplateData) (string, error)
-}
-
-// GenerateRunner は、ナレーションスクリプト生成を実行する責務を持つインターフェースです。
-type GenerateRunner interface {
-	Run(ctx context.Context) (string, error)
-}
-
-// DefaultGenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
-type DefaultGenerateRunner struct {
+// GenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
+type GenerateRunner struct {
 	options       *config.GenerateOptions
 	extractor     *extract.Extractor
-	promptBuilder promptBuilder
+	promptBuilder prompt.PromptBuilder
 	aiClient      gemini.GenerativeModel
 	reader        remoteio.InputReader
 }
 
-// NewDefaultGenerateRunner は、依存関係を注入して DefaultGenerateRunner の新しいインスタンスを生成します。
-func NewDefaultGenerateRunner(
+// NewGenerateRunner は、依存関係を注入して GenerateRunner の新しいインスタンスを生成します。
+func NewGenerateRunner(
 	options *config.GenerateOptions,
 	extractor *extract.Extractor,
-	promptBuilder promptBuilder,
+	promptBuilder prompt.PromptBuilder,
 	aiClient gemini.GenerativeModel,
 	reader remoteio.InputReader,
-) *DefaultGenerateRunner {
-	return &DefaultGenerateRunner{
+) *GenerateRunner {
+	return &GenerateRunner{
 		options:       options,
 		extractor:     extractor,
 		promptBuilder: promptBuilder,
@@ -54,7 +43,7 @@ func NewDefaultGenerateRunner(
 }
 
 // Run は、入力ソースからコンテンツを読み込み、AIモデルを使用してナレーションスクリプトを生成する一連の処理を実行します。
-func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
+func (gr *GenerateRunner) Run(ctx context.Context) (string, error) {
 	inputContent, err := gr.readInputContent(ctx)
 	if err != nil {
 		return "", err
@@ -81,7 +70,7 @@ func (gr *DefaultGenerateRunner) Run(ctx context.Context) (string, error) {
 // ヘルパー関数 (入力処理)
 // --------------------------------------------------------------------------------
 
-func (gr *DefaultGenerateRunner) readFromURL(ctx context.Context) ([]byte, error) {
+func (gr *GenerateRunner) readFromURL(ctx context.Context) ([]byte, error) {
 	slog.Info("URLからコンテンツを取得中", "url", gr.options.ScriptURL, "timeout", gr.options.HTTPTimeout.String())
 
 	text, hasBodyFound, err := gr.extractor.FetchAndExtractText(ctx, gr.options.ScriptURL)
@@ -95,7 +84,7 @@ func (gr *DefaultGenerateRunner) readFromURL(ctx context.Context) ([]byte, error
 }
 
 // readInputContent は入力ソースからコンテンツを読み込みます。
-func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, error) {
+func (gr *GenerateRunner) readInputContent(ctx context.Context) ([]byte, error) {
 	var inputContent []byte
 	var err error
 
@@ -139,7 +128,7 @@ func (gr *DefaultGenerateRunner) readInputContent(ctx context.Context) ([]byte, 
 	return []byte(trimmedContent), nil
 }
 
-func (gr *DefaultGenerateRunner) buildFullPrompt(inputText string) (string, error) {
+func (gr *GenerateRunner) buildFullPrompt(inputText string) (string, error) {
 	data := prompt.TemplateData{InputText: inputText}
 	fullPromptString, err := gr.promptBuilder.Build(data)
 	if err != nil {

@@ -37,7 +37,7 @@ func BuildPipeline(ctx context.Context, appCtx *app.Container) (domain.Pipeline,
 }
 
 // buildGenerateRunner は、GenerateRunner のインスタンスを返します。
-func buildGenerateRunner(ctx context.Context, appCtx *app.Container) (runner.GenerateRunner, error) {
+func buildGenerateRunner(ctx context.Context, appCtx *app.Container) (domain.GenerateRunner, error) {
 	opts := appCtx.Options
 	extractor, err := extract.NewExtractor(appCtx.HTTPClient)
 	if err != nil {
@@ -58,7 +58,7 @@ func buildGenerateRunner(ctx context.Context, appCtx *app.Container) (runner.Gen
 		return nil, err
 	}
 
-	return runner.NewDefaultGenerateRunner(
+	return runner.NewGenerateRunner(
 		opts,
 		extractor,
 		promptBuilder,
@@ -68,14 +68,14 @@ func buildGenerateRunner(ctx context.Context, appCtx *app.Container) (runner.Gen
 }
 
 // buildPublisherRunner は、PublisherRunner のインスタンスを返します。
-func buildPublisherRunner(ctx context.Context, appCtx *app.Container) (runner.PublisherRunner, error) {
+func buildPublisherRunner(ctx context.Context, appCtx *app.Container) (domain.PublishRunner, error) {
 	opts := appCtx.Options
 	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.HTTPClient, appCtx.RemoteIO.Writer, opts.VoicevoxOutput)
 	if err != nil {
 		return nil, err
 	}
 
-	return runner.NewDefaultPublisherRunner(
+	return runner.NewPublisherRunner(
 		opts,
 		voicevoxExecutor,
 		appCtx.RemoteIO.Writer,
