@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"prototypus-ai-doc-go/internal/domain"
 
 	"prototypus-ai-doc-go/internal/app"
+	"prototypus-ai-doc-go/internal/pipeline"
 	"prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/runner"
 
@@ -18,8 +20,24 @@ import (
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
-// BuildGenerateRunner は、GenerateRunner のインスタンスを返します。
-func BuildGenerateRunner(ctx context.Context, appCtx *app.Container) (runner.GenerateRunner, error) {
+// BuildPipeline は、提供されたランナーを使用して新しいパイプラインを初期化して返します。
+func BuildPipeline(ctx context.Context, appCtx *app.Container) (domain.Pipeline, error) {
+	generateRunner, err := buildGenerateRunner(ctx, appCtx)
+	if err != nil {
+		return nil, fmt.Errorf("生成ランナーの初期化に失敗しました: %w", err)
+	}
+	publisherRunner, err := buildPublisherRunner(ctx, appCtx)
+	if err != nil {
+		return nil, fmt.Errorf("パブリッシャーランナーの初期化に失敗しました: %w", err)
+	}
+
+	p := pipeline.NewPipeline(generateRunner, publisherRunner)
+
+	return p, nil
+}
+
+// buildGenerateRunner は、GenerateRunner のインスタンスを返します。
+func buildGenerateRunner(ctx context.Context, appCtx *app.Container) (runner.GenerateRunner, error) {
 	opts := appCtx.Options
 	extractor, err := extract.NewExtractor(appCtx.HTTPClient)
 	if err != nil {
@@ -49,8 +67,8 @@ func BuildGenerateRunner(ctx context.Context, appCtx *app.Container) (runner.Gen
 	), nil
 }
 
-// BuildPublisherRunner は、PublisherRunner のインスタンスを返します。
-func BuildPublisherRunner(ctx context.Context, appCtx *app.Container) (runner.PublisherRunner, error) {
+// buildPublisherRunner は、PublisherRunner のインスタンスを返します。
+func buildPublisherRunner(ctx context.Context, appCtx *app.Container) (runner.PublisherRunner, error) {
 	opts := appCtx.Options
 	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.HTTPClient, appCtx.RemoteIO.Writer, opts.VoicevoxOutput)
 	if err != nil {

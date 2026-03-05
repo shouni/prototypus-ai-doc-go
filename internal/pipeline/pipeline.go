@@ -2,43 +2,38 @@ package pipeline
 
 import (
 	"context"
-	"errors"
-
 	"fmt"
 	"strings"
 
-	"prototypus-ai-doc-go/internal/app"
-	"prototypus-ai-doc-go/internal/builder"
-	"prototypus-ai-doc-go/internal/config"
+	"prototypus-ai-doc-go/internal/domain"
 )
 
-// Execute は、すべての依存関係を構築し実行します。
-func Execute(
-	ctx context.Context,
-	opts *config.GenerateOptions,
-) error {
-	if opts == nil {
-		return errors.New("オプションはnilにできません")
-	}
-	appCtx, err := builder.BuildContainer(ctx, opts)
-	if err != nil {
-		// コンテナの構築エラーをラップして返す
-		return fmt.Errorf("コンテナの構築に失敗しました: %w", err)
-	}
-	defer func() {
-		if closeErr := appCtx.Close(); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("コンテナのクローズに失敗しました: %w", closeErr))
-		}
-	}()
+// Pipeline はパイプラインの実行に必要な外部依存関係を保持するサービス構造体です。
+type Pipeline struct {
+	generateRunner domain.GenerateRunner
+	publishRunner  domain.PublishRunner
+}
 
-	generatedScript, err := generate(ctx, appCtx)
+// NewPipeline は、Container から必要な依存関係のみを抽出して MangaPipeline を生成します。
+func NewPipeline(generateRunner domain.GenerateRunner, publishRunner domain.PublishRunner) *Pipeline {
+	return &Pipeline{
+		generateRunner: generateRunner,
+		publishRunner:  publishRunner,
+	}
+}
+
+// Execute は、すべての依存関係を構築し実行します。
+func (p *Pipeline) Execute(
+	ctx context.Context,
+) error {
+	generatedScript, err := p.generate(ctx)
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(generatedScript) == "" {
 		return fmt.Errorf("AIモデルが空のスクリプトを返しました。プロンプトや入力コンテンツに問題がないか確認してください")
 	}
-	err = publish(ctx, appCtx, generatedScript)
+	err = p.publish(ctx, generatedScript)
 	if err != nil {
 		return err
 	}
@@ -48,15 +43,10 @@ func Execute(
 
 // generate は、すべての依存関係を構築し、スクリプトテキスト作成を実行します。
 // 実行結果の文字列とエラーを返します。
-func generate(
+func (p *Pipeline) generate(
 	ctx context.Context,
-	appCtx *app.Container,
 ) (string, error) {
-	generateRunner, err := builder.BuildGenerateRunner(ctx, appCtx)
-	if err != nil {
-		return "", fmt.Errorf("GenerateRunnerの構築に失敗しました: %w", err)
-	}
-	generatedScript, err := generateRunner.Run(ctx)
+	generatedScript, err := p.generateRunner.Run(ctx)
 	if err != nil {
 		return "", fmt.Errorf("スクリプトテキスト作成に失敗しました: %w", err)
 	}
@@ -65,16 +55,11 @@ func generate(
 }
 
 // publish は、すべての依存関係を構築し、パブリッシュパイプラインを実行します。
-func publish(
+func (p *Pipeline) publish(
 	ctx context.Context,
-	appCtx *app.Container,
 	scriptContent string,
 ) error {
-	publishRunner, err := builder.BuildPublisherRunner(ctx, appCtx)
-	if err != nil {
-		return fmt.Errorf("PublisherRunnerの構築に失敗しました: %w", err)
-	}
-	err = publishRunner.Run(ctx, scriptContent)
+	err := p.publishRunner.Run(ctx, scriptContent)
 	if err != nil {
 		return fmt.Errorf("公開処理の実行に失敗しました: %w", err)
 	}
