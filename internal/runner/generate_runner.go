@@ -32,7 +32,7 @@ type DefaultGenerateRunner struct {
 	options       *config.GenerateOptions
 	extractor     *extract.Extractor
 	promptBuilder promptBuilder
-	aiClient      *gemini.Client
+	aiClient      gemini.GenerativeModel
 	reader        remoteio.InputReader
 }
 
@@ -41,7 +41,7 @@ func NewDefaultGenerateRunner(
 	options *config.GenerateOptions,
 	extractor *extract.Extractor,
 	promptBuilder promptBuilder,
-	aiClient *gemini.Client,
+	aiClient gemini.GenerativeModel,
 	reader remoteio.InputReader,
 ) *DefaultGenerateRunner {
 	return &DefaultGenerateRunner{

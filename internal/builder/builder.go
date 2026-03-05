@@ -65,7 +65,7 @@ func BuildPublisherRunner(ctx context.Context, appCtx *app.Container) (runner.Pu
 }
 
 // initializeAIClient は、gemini を初期化します。
-func initializeAIClient(ctx context.Context) (*gemini.Client, error) {
+func initializeAIClient(ctx context.Context) (gemini.GenerativeModel, error) {
 	finalAPIKey := os.Getenv("GEMINI_API_KEY")
 	if finalAPIKey == "" {
 		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY を確認してください。")
