@@ -5,35 +5,23 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+
+	"prototypus-ai-doc-go/internal/domain"
 )
 
-// ----------------------------------------------------------------
-// 抽象化とデータ構造
-// ----------------------------------------------------------------
-
-// TemplateData はプロンプトテンプレートに渡すデータ構造です。
-type TemplateData struct {
+// templateData はプロンプトテンプレートに渡すデータ構造です。
+type templateData struct {
 	InputText string
 }
 
-// PromptBuilder は、テンプレートデータから最終的なプロンプト文字列を生成する責務を定義します。
-// これにより、具体的な実装（text/templateなど）から利用側を分離できます。
-type PromptBuilder interface {
-	Build(data TemplateData) (string, error)
-}
-
-// ----------------------------------------------------------------
-// ビルダー実装
-// ----------------------------------------------------------------
-
-// textTemplateBuilder は PromptBuilder インターフェースの具体的な実装です。
-type textTemplateBuilder struct {
+// templateBuilder は PromptBuilder インターフェースの具体的な実装です。
+type templateBuilder struct {
 	tmpl *template.Template
 }
 
 // NewBuilder は PromptBuilder インターフェースを実装する新しいインスタンスを初期化します。
 // テンプレート文字列を受け取り、それをパースして PromptBuilder を返します。
-func NewBuilder(templateStr string) (PromptBuilder, error) {
+func NewBuilder(templateStr string) (domain.PromptBuilder, error) {
 	if strings.TrimSpace(templateStr) == "" {
 		return nil, fmt.Errorf("プロンプトテンプレートの内容が空です")
 	}
@@ -53,11 +41,13 @@ func NewBuilder(templateStr string) (PromptBuilder, error) {
 	}
 
 	// インターフェース型として具体的な実装を返す
-	return &textTemplateBuilder{tmpl: tmpl}, nil
+	return &templateBuilder{tmpl: tmpl}, nil
 }
 
 // Build は TemplateData を埋め込み、プロンプト文字列を完成させます。
-func (b *textTemplateBuilder) Build(data TemplateData) (string, error) {
+func (b *templateBuilder) Build(inputText string) (string, error) {
+	data := templateData{InputText: inputText}
+
 	// 1. データ検証
 	if strings.TrimSpace(data.InputText) == "" {
 		// エラーメッセージにテンプレート名を含める (tmpl.Name()を使用)

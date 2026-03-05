@@ -40,7 +40,6 @@ func (pr *PublisherRunner) Run(ctx context.Context, scriptContent string) error 
 
 // publishAudioAndScript は音声合成とスクリプトのアップロードを実行します。
 func (pr *PublisherRunner) publishAudioAndScript(ctx context.Context, scriptContent string) error {
-	// PublisherRunner
 	slog.InfoContext(ctx, "VOICEVOXによる音声合成を開始します。", "output_path", pr.options.VoicevoxOutput)
 	if err := pr.voicevoxExecutor.Execute(ctx, scriptContent, pr.options.VoicevoxOutput); err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました (%s): %w", pr.options.VoicevoxOutput, err)

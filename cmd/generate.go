@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
+	"log/slog"
 	"prototypus-ai-doc-go/internal/builder"
 	"prototypus-ai-doc-go/internal/config"
 
@@ -48,7 +48,7 @@ func generateCommand(cmd *cobra.Command, args []string) error {
 	}
 	defer func() {
 		if closeErr := appCtx.Close(); closeErr != nil {
-			err = errors.Join(err, fmt.Errorf("コンテナのクローズに失敗しました: %w", closeErr))
+			slog.ErrorContext(ctx, "コンテナのクローズに失敗しました", "error", closeErr)
 		}
 	}()
 

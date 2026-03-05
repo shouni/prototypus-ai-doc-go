@@ -19,3 +19,8 @@ type GenerateRunner interface {
 type PublishRunner interface {
 	Run(ctx context.Context, scriptContent string) error
 }
+
+// PromptBuilder は、プロンプト文字列を生成する責務を定義します。
+type PromptBuilder interface {
+	Build(inputText string) (string, error)
+}
