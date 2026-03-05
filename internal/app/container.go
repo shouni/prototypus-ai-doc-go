@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"prototypus-ai-doc-go/internal/config"
 
 	"github.com/shouni/go-http-kit/pkg/httpkit"
@@ -37,11 +38,11 @@ func (r *RemoteIO) Close() error {
 
 // Close は、Container が保持するすべての外部接続リソースを安全に解放します。
 func (c *Container) Close() error {
-	// RemoteIO のリソース解放を委譲
+	var errs error
 	if c.RemoteIO != nil {
 		if err := c.RemoteIO.Close(); err != nil {
-			return err
+			errs = errors.Join(errs, err)
 		}
 	}
-	return nil
+	return errs
 }

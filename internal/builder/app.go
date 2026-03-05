@@ -32,8 +32,13 @@ func BuildContainer(ctx context.Context, options *config.GenerateOptions) (conta
 	}
 	resources = append(resources, rio)
 
+	timeout := options.HTTPTimeout
+	if timeout == 0 {
+		timeout = config.DefaultHTTPTimeout
+	}
+
 	httpClient := httpkit.New(
-		config.DefaultHTTPTimeout,
+		timeout,
 		httpkit.WithMaxRetries(1),
 		httpkit.WithSkipNetworkValidation(true),
 	)

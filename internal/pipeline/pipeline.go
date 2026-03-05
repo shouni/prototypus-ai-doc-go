@@ -19,8 +19,8 @@ func Execute(
 ) (err error) {
 	appCtx, err := builder.BuildContainer(ctx, opts)
 	if err != nil {
-		// AppContextの構築エラーをラップして返す
-		return fmt.Errorf("AppContextの構築に失敗しました: %w", err)
+		// コンテナの構築エラーをラップして返す
+		return fmt.Errorf("コンテナの構築に失敗しました: %w", err)
 	}
 	defer func() {
 		if closeErr := appCtx.Close(); closeErr != nil {
