@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"prototypus-ai-doc-go/internal/config"
+	"prototypus-ai-doc-go/internal/domain"
 
 	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/shouni/go-remote-io/pkg/remoteio"
@@ -15,6 +16,8 @@ type Container struct {
 	RemoteIO *RemoteIO
 	// External Adapters
 	HTTPClient httpkit.ClientInterface
+	// Business Logic
+	Pipeline domain.Pipeline
 }
 
 // RemoteIO は外部ストレージ操作に関するコンポーネントをまとめます。

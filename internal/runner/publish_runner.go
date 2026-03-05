@@ -5,29 +5,25 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"prototypus-ai-doc-go/internal/config"
 	"strings"
+
+	"prototypus-ai-doc-go/internal/config"
 
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-utils/iohandler"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 )
 
-// PublisherRunner は、生成されたスクリプトの公開処理を実行する責務を持つインターフェースです。
-type PublisherRunner interface {
-	Run(ctx context.Context, scriptContent string) error
-}
-
-// DefaultPublisherRunner は、スクリプトの公開処理を実行する具象構造体です。
-type DefaultPublisherRunner struct {
+// PublishRunner は、スクリプトの公開処理を実行する具象構造体です。
+type PublishRunner struct {
 	options          *config.GenerateOptions
 	voicevoxExecutor voicevox.EngineExecutor
 	writer           remoteio.OutputWriter
 }
 
-// NewDefaultPublisherRunner は DefaultPublisherRunner の新しいインスタンスを作成します。
-func NewDefaultPublisherRunner(options *config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *DefaultPublisherRunner {
-	return &DefaultPublisherRunner{
+// NewPublisherRunner は DefaultPublisherRunner の新しいインスタンスを作成します。
+func NewPublisherRunner(options *config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *PublishRunner {
+	return &PublishRunner{
 		options:          options,
 		voicevoxExecutor: voicevoxExecutor,
 		writer:           writer,
@@ -35,7 +31,7 @@ func NewDefaultPublisherRunner(options *config.GenerateOptions, voicevoxExecutor
 }
 
 // Run は公開処理のパイプライン全体を実行します。
-func (pr *DefaultPublisherRunner) Run(ctx context.Context, scriptContent string) error {
+func (pr *PublishRunner) Run(ctx context.Context, scriptContent string) error {
 	if pr.options.VoicevoxOutput != "" {
 		return pr.publishAudioAndScript(ctx, scriptContent)
 	}
@@ -44,8 +40,7 @@ func (pr *DefaultPublisherRunner) Run(ctx context.Context, scriptContent string)
 }
 
 // publishAudioAndScript は音声合成とスクリプトのアップロードを実行します。
-func (pr *DefaultPublisherRunner) publishAudioAndScript(ctx context.Context, scriptContent string) error {
-	// 音声合成
+func (pr *PublishRunner) publishAudioAndScript(ctx context.Context, scriptContent string) error {
 	slog.InfoContext(ctx, "VOICEVOXによる音声合成を開始します。", "output_path", pr.options.VoicevoxOutput)
 	if err := pr.voicevoxExecutor.Execute(ctx, scriptContent, pr.options.VoicevoxOutput); err != nil {
 		return fmt.Errorf("音声合成パイプラインの実行に失敗しました (%s): %w", pr.options.VoicevoxOutput, err)

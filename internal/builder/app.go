@@ -47,5 +47,11 @@ func BuildContainer(ctx context.Context, options *config.GenerateOptions) (*app.
 		HTTPClient: httpClient,
 	}
 
+	p, err := buildPipeline(ctx, appCtx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build pipeline: %w", err)
+	}
+	appCtx.Pipeline = p
+
 	return appCtx, nil
 }

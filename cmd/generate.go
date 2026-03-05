@@ -2,8 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
+	"prototypus-ai-doc-go/internal/builder"
 	"prototypus-ai-doc-go/internal/config"
-	"prototypus-ai-doc-go/internal/pipeline"
 
 	"github.com/spf13/cobra"
 )
@@ -40,7 +41,18 @@ func generateCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--voicevoxオプションと--output-fileオプションは同時に指定できません")
 	}
 
-	err := pipeline.Execute(ctx, &opts)
+	appCtx, err := builder.BuildContainer(ctx, &opts)
+	if err != nil {
+		// コンテナの構築エラーをラップして返す
+		return fmt.Errorf("コンテナの構築に失敗しました: %w", err)
+	}
+	defer func() {
+		if closeErr := appCtx.Close(); closeErr != nil {
+			slog.ErrorContext(ctx, "コンテナのクローズに失敗しました", "error", closeErr)
+		}
+	}()
+
+	err = appCtx.Pipeline.Execute(ctx)
 	if err != nil {
 		return err
 	}
