@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"prototypus-ai-doc-go/internal/app"
 	"prototypus-ai-doc-go/internal/config"
 
@@ -17,7 +18,9 @@ func BuildContainer(ctx context.Context, options *config.GenerateOptions) (conta
 		if err != nil {
 			for _, r := range resources {
 				if r != nil {
-					_ = r.Close()
+					if closeErr := r.Close(); closeErr != nil {
+						slog.Warn("failed to close resource during cleanup", "error", closeErr)
+					}
 				}
 			}
 		}

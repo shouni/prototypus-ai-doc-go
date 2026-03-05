@@ -16,7 +16,7 @@ import (
 func Execute(
 	ctx context.Context,
 	opts *config.GenerateOptions,
-) error {
+) (err error) {
 	appCtx, err := builder.BuildContainer(ctx, opts)
 	if err != nil {
 		// AppContextの構築エラーをラップして返す

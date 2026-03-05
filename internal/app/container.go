@@ -26,6 +26,9 @@ type RemoteIO struct {
 
 // Close は、RemoteIO が保持する Factory などの内部リソースを解放します。
 func (r *RemoteIO) Close() error {
+	if r == nil {
+		return nil
+	}
 	if r.Factory != nil {
 		return r.Factory.Close()
 	}

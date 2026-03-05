@@ -3,6 +3,7 @@ package builder
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"prototypus-ai-doc-go/internal/app"
 
@@ -18,7 +19,9 @@ func buildRemoteIO(ctx context.Context) (rio *app.RemoteIO, err error) {
 
 	defer func() {
 		if err != nil {
-			_ = factory.Close()
+			if closeErr := factory.Close(); closeErr != nil {
+				slog.Warn("failed to close GCS factory during cleanup", "error", closeErr)
+			}
 		}
 	}()
 
