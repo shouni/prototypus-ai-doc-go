@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/shouni/clibase v1.0.2
-	github.com/shouni/go-gemini-client v1.0.11
+	github.com/shouni/go-gemini-client v1.0.13
 	github.com/shouni/go-http-kit v1.2.1
 	github.com/shouni/go-remote-io v1.2.1
 	github.com/shouni/go-utils v1.0.18
@@ -77,7 +77,7 @@ require (
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/api v0.267.0 // indirect
-	google.golang.org/genai v1.47.0 // indirect
+	google.golang.org/genai v1.48.0 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect

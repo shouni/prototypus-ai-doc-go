@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 
+	"prototypus-ai-doc-go/internal/app"
 	"prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/runner"
 
@@ -18,15 +19,11 @@ import (
 )
 
 // BuildGenerateRunner は、GenerateRunner のインスタンスを返します。
-func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.GenerateRunner, error) {
-	opts := appCtx.options
-	extractor, err := extract.NewExtractor(appCtx.httpClient)
+func BuildGenerateRunner(ctx context.Context, appCtx *app.Container) (runner.GenerateRunner, error) {
+	opts := appCtx.Options
+	extractor, err := extract.NewExtractor(appCtx.HTTPClient)
 	if err != nil {
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
-	}
-	reader, err := appCtx.ioFactory.InputReader()
-	if err != nil {
-		return nil, fmt.Errorf("入力リーダの初期化に失敗しました: %w", err)
 	}
 
 	templateStr, err := prompt.GetPromptByMode(opts.Mode)
@@ -48,19 +45,14 @@ func BuildGenerateRunner(ctx context.Context, appCtx AppContext) (runner.Generat
 		extractor,
 		promptBuilder,
 		aiClient,
-		reader,
+		appCtx.RemoteIO.Reader,
 	), nil
 }
 
 // BuildPublisherRunner は、PublisherRunner のインスタンスを返します。
-func BuildPublisherRunner(ctx context.Context, appCtx AppContext) (runner.PublisherRunner, error) {
-	opts := appCtx.options
-	writer, err := appCtx.ioFactory.OutputWriter()
-	if err != nil {
-		return nil, fmt.Errorf("出力ライターの初期化に失敗しました: %w", err)
-	}
-
-	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.httpClient, writer, opts.VoicevoxOutput)
+func BuildPublisherRunner(ctx context.Context, appCtx *app.Container) (runner.PublisherRunner, error) {
+	opts := appCtx.Options
+	voicevoxExecutor, err := initializeVoicevoxExecutor(ctx, appCtx.HTTPClient, appCtx.RemoteIO.Writer, opts.VoicevoxOutput)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +60,7 @@ func BuildPublisherRunner(ctx context.Context, appCtx AppContext) (runner.Publis
 	return runner.NewDefaultPublisherRunner(
 		opts,
 		voicevoxExecutor,
-		writer,
+		appCtx.RemoteIO.Writer,
 	), nil
 }
 

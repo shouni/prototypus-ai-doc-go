@@ -29,7 +29,7 @@ type GenerateRunner interface {
 
 // DefaultGenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
 type DefaultGenerateRunner struct {
-	options       config.GenerateOptions
+	options       *config.GenerateOptions
 	extractor     *extract.Extractor
 	promptBuilder promptBuilder
 	aiClient      *gemini.Client
@@ -38,7 +38,7 @@ type DefaultGenerateRunner struct {
 
 // NewDefaultGenerateRunner は、依存関係を注入して DefaultGenerateRunner の新しいインスタンスを生成します。
 func NewDefaultGenerateRunner(
-	options config.GenerateOptions,
+	options *config.GenerateOptions,
 	extractor *extract.Extractor,
 	promptBuilder promptBuilder,
 	aiClient *gemini.Client,
