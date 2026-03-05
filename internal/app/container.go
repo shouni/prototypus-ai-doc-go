@@ -1,8 +1,6 @@
 package app
 
 import (
-	"log/slog"
-
 	"prototypus-ai-doc-go/internal/config"
 
 	"github.com/shouni/go-http-kit/pkg/httpkit"
@@ -35,11 +33,12 @@ func (r *RemoteIO) Close() error {
 }
 
 // Close は、Container が保持するすべての外部接続リソースを安全に解放します。
-func (c *Container) Close() {
+func (c *Container) Close() error {
 	// RemoteIO のリソース解放を委譲
 	if c.RemoteIO != nil {
 		if err := c.RemoteIO.Close(); err != nil {
-			slog.Error("failed to close RemoteIO", "error", err)
+			return err
 		}
 	}
+	return nil
 }

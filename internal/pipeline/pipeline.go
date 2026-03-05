@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 
 	"fmt"
 	"strings"
@@ -21,6 +22,11 @@ func Execute(
 		// AppContextの構築エラーをラップして返す
 		return fmt.Errorf("AppContextの構築に失敗しました: %w", err)
 	}
+	defer func() {
+		if closeErr := appCtx.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("コンテナのクローズに失敗しました: %w", closeErr))
+		}
+	}()
 
 	generatedScript, err := generate(ctx, appCtx)
 	if err != nil {

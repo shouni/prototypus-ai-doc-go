@@ -10,11 +10,18 @@ import (
 )
 
 // buildRemoteIO は、GCS ベースの I/O コンポーネントを初期化します。
-func buildRemoteIO(ctx context.Context) (*app.RemoteIO, error) {
+func buildRemoteIO(ctx context.Context) (rio *app.RemoteIO, err error) {
 	factory, err := gcsfactory.New(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCS factory: %w", err)
 	}
+
+	defer func() {
+		if err != nil {
+			_ = factory.Close()
+		}
+	}()
+
 	r, err := factory.InputReader()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create input reader: %w", err)
