@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"prototypus-ai-doc-go/internal/domain"
 
 	"prototypus-ai-doc-go/internal/app"
+	"prototypus-ai-doc-go/internal/domain"
 	"prototypus-ai-doc-go/internal/pipeline"
 	"prototypus-ai-doc-go/internal/prompt"
 	"prototypus-ai-doc-go/internal/runner"
@@ -20,8 +20,8 @@ import (
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
 )
 
-// BuildPipeline は、提供されたランナーを使用して新しいパイプラインを初期化して返します。
-func BuildPipeline(ctx context.Context, appCtx *app.Container) (domain.Pipeline, error) {
+// buildPipeline は、提供されたランナーを使用して新しいパイプラインを初期化して返します。
+func buildPipeline(ctx context.Context, appCtx *app.Container) (domain.Pipeline, error) {
 	generateRunner, err := buildGenerateRunner(ctx, appCtx)
 	if err != nil {
 		return nil, fmt.Errorf("生成ランナーの初期化に失敗しました: %w", err)

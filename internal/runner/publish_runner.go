@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"prototypus-ai-doc-go/internal/config"
 	"strings"
+
+	"prototypus-ai-doc-go/internal/config"
 
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-utils/iohandler"
