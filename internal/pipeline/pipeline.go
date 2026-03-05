@@ -2,10 +2,11 @@ package pipeline
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"strings"
 
+	"prototypus-ai-doc-go/internal/app"
 	"prototypus-ai-doc-go/internal/builder"
 	"prototypus-ai-doc-go/internal/config"
 )
@@ -13,22 +14,13 @@ import (
 // Execute は、すべての依存関係を構築し実行します。
 func Execute(
 	ctx context.Context,
-	opts config.GenerateOptions,
+	opts *config.GenerateOptions,
 ) error {
-	appCtx, err := builder.NewAppContext(ctx, opts)
+	appCtx, err := builder.BuildContainer(ctx, opts)
 	if err != nil {
 		// AppContextの構築エラーをラップして返す
 		return fmt.Errorf("AppContextの構築に失敗しました: %w", err)
 	}
-	if err := appCtx.Validate(); err != nil {
-		return fmt.Errorf("AppContextの検証に失敗しました: %w", err)
-	}
-	defer func() {
-		if closeErr := appCtx.Close(); closeErr != nil {
-			// メインのエラーとクローズエラーを結合して返す
-			err = errors.Join(err, closeErr)
-		}
-	}()
 
 	generatedScript, err := generate(ctx, appCtx)
 	if err != nil {
@@ -49,7 +41,7 @@ func Execute(
 // 実行結果の文字列とエラーを返します。
 func generate(
 	ctx context.Context,
-	appCtx builder.AppContext,
+	appCtx *app.Container,
 ) (string, error) {
 	generateRunner, err := builder.BuildGenerateRunner(ctx, appCtx)
 	if err != nil {
@@ -66,7 +58,7 @@ func generate(
 // publish は、すべての依存関係を構築し、パブリッシュパイプラインを実行します。
 func publish(
 	ctx context.Context,
-	appCtx builder.AppContext,
+	appCtx *app.Container,
 	scriptContent string,
 ) error {
 	publishRunner, err := builder.BuildPublisherRunner(ctx, appCtx)

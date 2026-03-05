@@ -20,13 +20,13 @@ type PublisherRunner interface {
 
 // DefaultPublisherRunner は、スクリプトの公開処理を実行する具象構造体です。
 type DefaultPublisherRunner struct {
-	options          config.GenerateOptions
+	options          *config.GenerateOptions
 	voicevoxExecutor voicevox.EngineExecutor
 	writer           remoteio.OutputWriter
 }
 
 // NewDefaultPublisherRunner は DefaultPublisherRunner の新しいインスタンスを作成します。
-func NewDefaultPublisherRunner(options config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *DefaultPublisherRunner {
+func NewDefaultPublisherRunner(options *config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *DefaultPublisherRunner {
 	return &DefaultPublisherRunner{
 		options:          options,
 		voicevoxExecutor: voicevoxExecutor,

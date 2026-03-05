@@ -40,7 +40,7 @@ func generateCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--voicevoxオプションと--output-fileオプションは同時に指定できません")
 	}
 
-	err := pipeline.Execute(ctx, opts)
+	err := pipeline.Execute(ctx, &opts)
 	if err != nil {
 		return err
 	}
