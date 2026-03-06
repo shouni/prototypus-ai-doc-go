@@ -8,6 +8,11 @@ import (
 	"prototypus-ai-doc-go/internal/domain"
 )
 
+// templateData はプロンプトテンプレートに渡すデータ構造です。
+type templateData struct {
+	InputText string
+}
+
 // templateBuilder は PromptBuilder インターフェースの具体的な実装です。
 type templateBuilder struct {
 	templates map[string]*template.Template
@@ -39,11 +44,14 @@ func (b *templateBuilder) Build(mode string, inputText string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("不明なモードです: '%s'", mode)
 	}
+	if strings.TrimSpace(inputText) == "" {
+		return "", fmt.Errorf("プロンプト実行失敗: 入力テキストが空です (モード: %s)", mode)
+	}
 
 	var sb strings.Builder
 	data := templateData{InputText: inputText}
 	if err := tmpl.Execute(&sb, data); err != nil {
-		return "", fmt.Errorf("プロンプトテンプレートの実行に失敗しました: %w", err)
+		return "", fmt.Errorf("プロンプトテンプレート '%s' の実行に失敗しました: %w", mode, err)
 	}
 
 	return sb.String(), nil
