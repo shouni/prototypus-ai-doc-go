@@ -44,11 +44,7 @@ func buildGenerateRunner(ctx context.Context, appCtx *app.Container) (domain.Gen
 		return nil, fmt.Errorf("エクストラクタの初期化に失敗しました: %w", err)
 	}
 
-	templateStr, err := prompt.GetPromptByMode(opts.Mode)
-	if err != nil {
-		return nil, err
-	}
-	promptBuilder, err := prompt.NewBuilder(templateStr)
+	promptBuilder, err := prompt.NewBuilder()
 	if err != nil {
 		return nil, fmt.Errorf("プロンプトビルダーの作成に失敗しました: %w", err)
 	}

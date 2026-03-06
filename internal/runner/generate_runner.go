@@ -48,11 +48,10 @@ func (gr *GenerateRunner) Run(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	slog.Info("処理開始", "mode", gr.options.Mode, "model", gr.options.AIModel, "input_size", len(inputContent))
 	slog.Info("AIによるスクリプト生成を開始します...")
 
-	promptContent, err := gr.promptBuilder.Build(string(inputContent))
+	promptContent, err := gr.promptBuilder.Build(gr.options.Mode, string(inputContent))
 	if err != nil {
 		return "", err
 	}
