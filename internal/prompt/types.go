@@ -4,6 +4,12 @@ import (
 	_ "embed"
 )
 
+const (
+	ModeDuet     = "duet"
+	ModeSolo     = "solo"
+	ModeDialogue = "dialogue"
+)
+
 var (
 	//go:embed zundametan_duet.md
 	duetPrompt string
@@ -11,11 +17,11 @@ var (
 	soloPrompt string
 	//go:embed zundametan_dialogue.md
 	dialoguePrompt string
-
-	// modeTemplates はモードとテンプレート文字列を紐づけるマップです。
-	modeTemplates = map[string]string{
-		"duet":     duetPrompt,
-		"solo":     soloPrompt,
-		"dialogue": dialoguePrompt,
-	}
 )
+
+// modeTemplates はモードとテンプレート文字列を紐づけるマップです。
+var modeTemplates = map[string]string{
+	ModeDuet:     duetPrompt,
+	ModeSolo:     soloPrompt,
+	ModeDialogue: dialoguePrompt,
+}
