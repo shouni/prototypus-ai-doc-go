@@ -5,9 +5,9 @@ import (
 )
 
 const (
-	ModeDuet     = "duet"
-	ModeSolo     = "solo"
-	ModeDialogue = "dialogue"
+	modeDuet     = "duet"
+	modeSolo     = "solo"
+	modeDialogue = "dialogue"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 
 // modeTemplates はモードとテンプレート文字列を紐づけるマップです。
 var modeTemplates = map[string]string{
-	ModeDuet:     duetPrompt,
-	ModeSolo:     soloPrompt,
-	ModeDialogue: dialoguePrompt,
+	modeDuet:     duetPrompt,
+	modeSolo:     soloPrompt,
+	modeDialogue: dialoguePrompt,
 }
