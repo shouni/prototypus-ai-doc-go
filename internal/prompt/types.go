@@ -4,12 +4,6 @@ import (
 	_ "embed"
 )
 
-const (
-	ModeDuet     = "duet"
-	ModeSolo     = "solo"
-	ModeDialogue = "dialogue"
-)
-
 var (
 	//go:embed zundametan_duet.md
 	duetPrompt string
@@ -20,8 +14,8 @@ var (
 
 	// modeTemplates はモードとテンプレート文字列を紐づけるマップです。
 	modeTemplates = map[string]string{
-		ModeDuet:     duetPrompt,
-		ModeSolo:     soloPrompt,
-		ModeDialogue: dialoguePrompt,
+		"duet":     duetPrompt,
+		"solo":     soloPrompt,
+		"dialogue": dialoguePrompt,
 	}
 )
