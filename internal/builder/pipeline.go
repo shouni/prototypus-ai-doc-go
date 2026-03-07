@@ -79,7 +79,7 @@ func buildPublishRunner(ctx context.Context, appCtx *app.Container) (domain.Publ
 }
 
 // initializeAIClient は、gemini を初期化します。
-func initializeAIClient(ctx context.Context) (gemini.GenerativeModel, error) {
+func initializeAIClient(ctx context.Context) (gemini.Generator, error) {
 	finalAPIKey := os.Getenv("GEMINI_API_KEY")
 	if finalAPIKey == "" {
 		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY を確認してください。")
@@ -97,7 +97,7 @@ func initializeAIClient(ctx context.Context) (gemini.GenerativeModel, error) {
 }
 
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化します。
-func initializeVoicevoxExecutor(ctx context.Context, httpClient httpkit.ClientInterface, writer remoteio.OutputWriter, voicevoxOutput string) (voicevox.EngineExecutor, error) {
+func initializeVoicevoxExecutor(ctx context.Context, httpClient httpkit.RequestExecutor, writer remoteio.OutputWriter, voicevoxOutput string) (voicevox.EngineExecutor, error) {
 	if voicevoxOutput == "" {
 		slog.Info("VOICEVOXの出力先が未指定のため、エンジンエクゼキュータをスキップします。")
 		return nil, nil

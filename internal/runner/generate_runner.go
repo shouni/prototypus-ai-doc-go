@@ -21,7 +21,7 @@ type GenerateRunner struct {
 	options       *config.GenerateOptions
 	extractor     *extract.Extractor
 	promptBuilder domain.PromptBuilder
-	aiClient      gemini.GenerativeModel
+	aiClient      gemini.Generator
 	reader        remoteio.InputReader
 }
 
@@ -30,7 +30,7 @@ func NewGenerateRunner(
 	options *config.GenerateOptions,
 	extractor *extract.Extractor,
 	promptBuilder domain.PromptBuilder,
-	aiClient gemini.GenerativeModel,
+	aiClient gemini.Generator,
 	reader remoteio.InputReader,
 ) *GenerateRunner {
 	return &GenerateRunner{
