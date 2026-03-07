@@ -15,7 +15,7 @@ type Container struct {
 	// I/O and Storage
 	RemoteIO *RemoteIO
 	// External Adapters
-	HTTPClient httpkit.ClientInterface
+	HTTPClient httpkit.RequestExecutor
 	// Business Logic
 	Pipeline domain.Pipeline
 }
