@@ -78,22 +78,26 @@ func buildPublishRunner(ctx context.Context, appCtx *app.Container) (domain.Publ
 	), nil
 }
 
-// initializeAIClient は、gemini を初期化します。
+// initializeAIClient は、GEMINI_API_KEY が存在すればそれを優先し、
+// なければ Vertex AI (PROJECT_ID) を使用してクライアントを初期化します。
 func initializeAIClient(ctx context.Context) (gemini.Generator, error) {
-	finalAPIKey := os.Getenv("GEMINI_API_KEY")
-	if finalAPIKey == "" {
-		return nil, errors.New("AI APIキーが設定されていません。環境変数 GEMINI_API_KEY を確認してください。")
+	apiKey := os.Getenv("GEMINI_API_KEY")
+
+	if apiKey != "" {
+		return gemini.NewClient(ctx, gemini.Config{
+			APIKey: apiKey,
+		})
 	}
 
-	clientConfig := gemini.Config{
-		APIKey: finalAPIKey,
+	projectID := os.Getenv("PROJECT_ID")
+	if projectID == "" {
+		return nil, errors.New("GEMINI_API_KEY または PROJECT_ID が必要です。環境変数を確認してください。")
 	}
 
-	aiClient, err := gemini.NewClient(ctx, clientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("AIクライアントの初期化に失敗しました: %w", err)
-	}
-	return aiClient, nil
+	return gemini.NewClient(ctx, gemini.Config{
+		ProjectID:  projectID,
+		LocationID: "global",
+	})
 }
 
 // initializeVoicevoxExecutor は、VOICEVOX Executorを初期化します。
