@@ -96,7 +96,7 @@ func initializeAIClient(ctx context.Context) (gemini.Generator, error) {
 
 	return gemini.NewClient(ctx, gemini.Config{
 		ProjectID:  projectID,
-		LocationID: "global", // 動作が確認できた global を指定
+		LocationID: "global",
 	})
 }
 
