@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 
-	"prototypus-ai-doc-go/internal/app"
-
 	"github.com/shouni/go-remote-io/pkg/gcsfactory"
+
+	"prototypus-ai-doc-go/internal/app"
 )
 
 // buildRemoteIO は、GCS ベースの I/O コンポーネントを初期化します。

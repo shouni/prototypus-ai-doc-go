@@ -7,17 +7,17 @@ import (
 	"log/slog"
 	"os"
 
-	"prototypus-ai-doc-go/internal/app"
-	"prototypus-ai-doc-go/internal/domain"
-	"prototypus-ai-doc-go/internal/pipeline"
-	"prototypus-ai-doc-go/internal/prompt"
-	"prototypus-ai-doc-go/internal/runner"
-
 	"github.com/shouni/go-gemini-client/pkg/gemini"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
+
+	"prototypus-ai-doc-go/internal/app"
+	"prototypus-ai-doc-go/internal/domain"
+	"prototypus-ai-doc-go/internal/pipeline"
+	"prototypus-ai-doc-go/internal/prompt"
+	"prototypus-ai-doc-go/internal/runner"
 )
 
 // buildPipeline は、提供されたランナーを使用して新しいパイプラインを初期化して返します。

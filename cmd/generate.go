@@ -3,10 +3,11 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
-	"prototypus-ai-doc-go/internal/builder"
-	"prototypus-ai-doc-go/internal/config"
 
 	"github.com/spf13/cobra"
+
+	"prototypus-ai-doc-go/internal/builder"
+	"prototypus-ai-doc-go/internal/config"
 )
 
 // グローバルなオプションインスタンス。
