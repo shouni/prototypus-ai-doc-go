@@ -2,11 +2,12 @@ package app
 
 import (
 	"errors"
-	"prototypus-ai-doc-go/internal/config"
-	"prototypus-ai-doc-go/internal/domain"
 
 	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/shouni/go-remote-io/pkg/remoteio"
+
+	"prototypus-ai-doc-go/internal/config"
+	"prototypus-ai-doc-go/internal/domain"
 )
 
 // Container はアプリケーションの依存関係（DIコンテナ）を保持します。

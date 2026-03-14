@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"prototypus-ai-doc-go/internal/config"
-
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-utils/iohandler"
 	"github.com/shouni/go-voicevox/pkg/voicevox"
+
+	"prototypus-ai-doc-go/internal/config"
 )
 
 // PublishRunner は、スクリプトの公開処理を実行する具象構造体です。

@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"strings"
 
-	"prototypus-ai-doc-go/internal/config"
-	"prototypus-ai-doc-go/internal/domain"
-
 	"github.com/shouni/go-gemini-client/pkg/gemini"
 	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-web-exact/v2/pkg/extract"
+
+	"prototypus-ai-doc-go/internal/config"
+	"prototypus-ai-doc-go/internal/domain"
 )
 
 // GenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
