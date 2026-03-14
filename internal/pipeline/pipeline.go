@@ -10,15 +10,15 @@ import (
 
 // Pipeline はパイプラインの実行に必要な外部依存関係を保持するサービス構造体です。
 type Pipeline struct {
-	generateRunner domain.GenerateRunner
-	publishRunner  domain.PublishRunner
+	generator domain.GenerateRunner
+	publisher domain.PublishRunner
 }
 
 // NewPipeline は、Container から必要な依存関係のみを抽出して MangaPipeline を生成します。
-func NewPipeline(generateRunner domain.GenerateRunner, publishRunner domain.PublishRunner) *Pipeline {
+func NewPipeline(generator domain.GenerateRunner, publisher domain.PublishRunner) *Pipeline {
 	return &Pipeline{
-		generateRunner: generateRunner,
-		publishRunner:  publishRunner,
+		generator: generator,
+		publisher: publisher,
 	}
 }
 
@@ -46,7 +46,7 @@ func (p *Pipeline) Execute(
 func (p *Pipeline) generate(
 	ctx context.Context,
 ) (string, error) {
-	generatedScript, err := p.generateRunner.Run(ctx)
+	generatedScript, err := p.generator.Run(ctx)
 	if err != nil {
 		return "", fmt.Errorf("スクリプトテキスト作成に失敗しました: %w", err)
 	}
@@ -59,7 +59,7 @@ func (p *Pipeline) publish(
 	ctx context.Context,
 	scriptContent string,
 ) error {
-	err := p.publishRunner.Run(ctx, scriptContent)
+	err := p.publisher.Run(ctx, scriptContent)
 	if err != nil {
 		return fmt.Errorf("公開処理の実行に失敗しました: %w", err)
 	}
