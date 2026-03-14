@@ -4,10 +4,10 @@ go 1.26
 
 require (
 	github.com/shouni/clibase v1.0.3
-	github.com/shouni/go-gemini-client v1.1.1
+	github.com/shouni/go-gemini-client v1.1.4
 	github.com/shouni/go-http-kit v1.3.3
 	github.com/shouni/go-remote-io v1.2.2
-	github.com/shouni/go-utils v1.0.19
+	github.com/shouni/go-utils v1.0.20
 	github.com/shouni/go-voicevox v1.2.1
 	github.com/shouni/go-web-exact/v2 v2.1.0
 	github.com/spf13/cobra v1.10.2
@@ -57,7 +57,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/shouni/netarmor v1.0.1 // indirect
+	github.com/shouni/netarmor v1.0.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
@@ -77,7 +77,7 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/api v0.271.0 // indirect
-	google.golang.org/genai v1.48.0 // indirect
+	google.golang.org/genai v1.50.0 // indirect
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
