@@ -56,7 +56,9 @@ func (gr *GenerateRunner) Run(ctx context.Context) (string, error) {
 	slog.Info("処理開始", "mode", gr.options.Mode, "model", gr.options.AIModel, "input_size", len(inputContent))
 	slog.Info("AIによるスクリプト生成を開始します...")
 
-	data := TemplateData{InputText: string(inputContent)}
+	data := TemplateData{
+		InputText: string(inputContent),
+	}
 	promptContent, err := gr.promptBuilder.Build(gr.options.Mode, data)
 	if err != nil {
 		return "", err

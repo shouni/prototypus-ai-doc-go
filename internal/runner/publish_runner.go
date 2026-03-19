@@ -21,7 +21,7 @@ type PublishRunner struct {
 	writer           remoteio.OutputWriter
 }
 
-// NewPublisherRunner は DefaultPublisherRunner の新しいインスタンスを作成します。
+// NewPublisherRunner は PublishRunner の新しいインスタンスを作成します。
 func NewPublisherRunner(options *config.Config, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *PublishRunner {
 	return &PublishRunner{
 		options:          options,

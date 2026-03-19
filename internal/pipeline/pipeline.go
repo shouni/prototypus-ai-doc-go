@@ -14,7 +14,7 @@ type Pipeline struct {
 	publisher domain.PublishRunner
 }
 
-// NewPipeline は、Container から必要な依存関係のみを抽出して MangaPipeline を生成します。
+// NewPipeline は、Pipeline を生成します。
 func NewPipeline(generator domain.GenerateRunner, publisher domain.PublishRunner) *Pipeline {
 	return &Pipeline{
 		generator: generator,
@@ -41,7 +41,7 @@ func (p *Pipeline) Execute(
 	return nil
 }
 
-// generate は、すべての依存関係を構築し、スクリプトテキスト作成を実行します。
+// generate は、スクリプトテキスト作成を実行します。
 // 実行結果の文字列とエラーを返します。
 func (p *Pipeline) generate(
 	ctx context.Context,
@@ -54,7 +54,7 @@ func (p *Pipeline) generate(
 	return generatedScript, nil
 }
 
-// publish は、すべての依存関係を構築し、パブリッシュパイプラインを実行します。
+// publish は、パブリッシュを実行します。
 func (p *Pipeline) publish(
 	ctx context.Context,
 	scriptContent string,
