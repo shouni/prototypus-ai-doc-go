@@ -16,9 +16,14 @@ import (
 	"prototypus-ai-doc-go/internal/domain"
 )
 
+// TemplateData はプロンプトテンプレートに渡すデータ構造です。
+type TemplateData struct {
+	InputText string
+}
+
 // GenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateRunner struct {
-	options       *config.GenerateOptions
+	options       *config.Config
 	extractor     *extract.Extractor
 	promptBuilder domain.PromptBuilder
 	aiClient      gemini.Generator
@@ -27,7 +32,7 @@ type GenerateRunner struct {
 
 // NewGenerateRunner は、依存関係を注入して GenerateRunner の新しいインスタンスを生成します。
 func NewGenerateRunner(
-	options *config.GenerateOptions,
+	options *config.Config,
 	extractor *extract.Extractor,
 	promptBuilder domain.PromptBuilder,
 	aiClient gemini.Generator,
@@ -51,7 +56,8 @@ func (gr *GenerateRunner) Run(ctx context.Context) (string, error) {
 	slog.Info("処理開始", "mode", gr.options.Mode, "model", gr.options.AIModel, "input_size", len(inputContent))
 	slog.Info("AIによるスクリプト生成を開始します...")
 
-	promptContent, err := gr.promptBuilder.Build(gr.options.Mode, string(inputContent))
+	data := TemplateData{InputText: string(inputContent)}
+	promptContent, err := gr.promptBuilder.Build(gr.options.Mode, data)
 	if err != nil {
 		return "", err
 	}
