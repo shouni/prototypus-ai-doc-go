@@ -16,13 +16,13 @@ import (
 
 // PublishRunner は、スクリプトの公開処理を実行する具象構造体です。
 type PublishRunner struct {
-	options          *config.GenerateOptions
+	options          *config.Config
 	voicevoxExecutor voicevox.EngineExecutor
 	writer           remoteio.OutputWriter
 }
 
 // NewPublisherRunner は DefaultPublisherRunner の新しいインスタンスを作成します。
-func NewPublisherRunner(options *config.GenerateOptions, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *PublishRunner {
+func NewPublisherRunner(options *config.Config, voicevoxExecutor voicevox.EngineExecutor, writer remoteio.OutputWriter) *PublishRunner {
 	return &PublishRunner{
 		options:          options,
 		voicevoxExecutor: voicevoxExecutor,

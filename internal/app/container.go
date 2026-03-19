@@ -12,7 +12,7 @@ import (
 
 // Container はアプリケーションの依存関係（DIコンテナ）を保持します。
 type Container struct {
-	Options *config.GenerateOptions
+	Config *config.Config
 	// I/O and Storage
 	RemoteIO *RemoteIO
 	// External Adapters

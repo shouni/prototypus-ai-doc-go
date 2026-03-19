@@ -114,6 +114,8 @@ github.com/shouni/go-gemini-client v1.1.4 h1:X53+yUIiEIpTNpzMSQ/Fwa/pXwYVfhNvf/T
 github.com/shouni/go-gemini-client v1.1.4/go.mod h1:Nhc6pTsEuAobBN4Jvtq9jdROgDfCvS8WM3UYX+YZoTI=
 github.com/shouni/go-http-kit v1.3.3 h1:pE0uGf5mvJ2QpA+BXor1WkDCED56Hm4OhDCJnqsj5q4=
 github.com/shouni/go-http-kit v1.3.3/go.mod h1:3mzsZpSj6Os3eqFM0JIQGRM4Q/nJiGke+GiFVSno1c0=
+github.com/shouni/go-prompt-kit v1.0.0 h1:B/aGXiBuV1tuZyUaAfSBWYiha5UBHzj+6zHA4AYOLpw=
+github.com/shouni/go-prompt-kit v1.0.0/go.mod h1:fqsYdnqJTxOUyDblnvJ0ChQBnYWWots1BVo0OgE2qnY=
 github.com/shouni/go-remote-io v1.2.2 h1:mMEjn1ZE14D/pzKGyIKtH/gW9m31GaQHy26SJF79IVc=
 github.com/shouni/go-remote-io v1.2.2/go.mod h1:lCMzjS8EMllIssil8Tw1zGNeQ7UlFoBiaHrG6ode5IQ=
 github.com/shouni/go-utils v1.0.20 h1:gdjQfqJdY+uJI02FPNSE7B9GTIihGQ4DMjN36+0pd9M=

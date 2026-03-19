@@ -13,7 +13,7 @@ import (
 )
 
 // BuildContainer は外部サービスとの接続を確立し、依存関係を組み立てた app.Container を返します。
-func BuildContainer(ctx context.Context, options *config.GenerateOptions) (*app.Container, error) {
+func BuildContainer(ctx context.Context, cfg *config.Config) (*app.Container, error) {
 	var resources []io.Closer
 	defer func() {
 		for _, r := range resources {
@@ -31,7 +31,7 @@ func BuildContainer(ctx context.Context, options *config.GenerateOptions) (*app.
 	}
 	resources = append(resources, rio)
 
-	timeout := options.HTTPTimeout
+	timeout := cfg.HTTPTimeout
 	if timeout == 0 {
 		timeout = config.DefaultHTTPTimeout
 	}
@@ -43,7 +43,7 @@ func BuildContainer(ctx context.Context, options *config.GenerateOptions) (*app.
 	)
 
 	appCtx := &app.Container{
-		Options:    options,
+		Config:     cfg,
 		RemoteIO:   rio,
 		HTTPClient: httpClient,
 	}
