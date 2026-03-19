@@ -9,9 +9,6 @@ import (
 	"prototypus-ai-doc-go/internal/builder"
 )
 
-//// グローバルなオプションインスタンス。
-//var opts config.Config
-
 // generateCmd はナレーションスクリプト生成のメインコマンドです。
 var generateCmd = &cobra.Command{
 	Use:   "generate",
