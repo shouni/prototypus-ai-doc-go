@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shouni/go-remote-io/pkg/remoteio"
+	"github.com/shouni/go-remote-io/remoteio"
 	"github.com/shouni/go-utils/iohandler"
-	"github.com/shouni/go-voicevox/pkg/voicevox"
+	"github.com/shouni/go-voicevox/voicevox"
 
 	"prototypus-ai-doc-go/internal/config"
 )

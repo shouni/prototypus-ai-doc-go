@@ -3,8 +3,8 @@ package app
 import (
 	"errors"
 
-	"github.com/shouni/go-http-kit/pkg/httpkit"
-	"github.com/shouni/go-remote-io/pkg/remoteio"
+	"github.com/shouni/go-http-kit/httpkit"
+	"github.com/shouni/go-remote-io/remoteio"
 
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/domain"
@@ -16,7 +16,7 @@ type Container struct {
 	// I/O and Storage
 	RemoteIO *RemoteIO
 	// External Adapters
-	HTTPClient httpkit.RequestExecutor
+	HTTPClient httpkit.Requester
 	// Business Logic
 	Pipeline domain.Pipeline
 }

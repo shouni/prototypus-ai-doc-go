@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shouni/go-web-exact/v2/pkg/extract"
+	"github.com/shouni/go-web-exact/v2/extract"
 
 	"prototypus-ai-doc-go/internal/adapters"
 	"prototypus-ai-doc-go/internal/app"

@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/shouni/go-remote-io/pkg/gcsfactory"
+	"github.com/shouni/go-remote-io/remoteio/gcs"
 
 	"prototypus-ai-doc-go/internal/app"
 )
 
 // buildRemoteIO は、GCS ベースの I/O コンポーネントを初期化します。
 func buildRemoteIO(ctx context.Context) (*app.RemoteIO, error) {
-	factory, err := gcsfactory.New(ctx)
+	factory, err := gcs.New(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCS factory: %w", err)
 	}

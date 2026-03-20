@@ -8,9 +8,9 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/shouni/go-gemini-client/pkg/gemini"
-	"github.com/shouni/go-remote-io/pkg/remoteio"
-	"github.com/shouni/go-web-exact/v2/pkg/extract"
+	"github.com/shouni/go-gemini-client/gemini"
+	"github.com/shouni/go-remote-io/remoteio"
+	"github.com/shouni/go-web-exact/v2/ports"
 
 	"prototypus-ai-doc-go/internal/config"
 	"prototypus-ai-doc-go/internal/domain"
@@ -24,7 +24,7 @@ type TemplateData struct {
 // GenerateRunner は generate コマンドの実行に必要な依存とオプションを保持します。
 type GenerateRunner struct {
 	options       *config.Config
-	extractor     *extract.Extractor
+	extractor     ports.Extractor
 	promptBuilder domain.PromptBuilder
 	aiClient      gemini.Generator
 	reader        remoteio.InputReader
@@ -33,7 +33,7 @@ type GenerateRunner struct {
 // NewGenerateRunner は、依存関係を注入して GenerateRunner の新しいインスタンスを生成します。
 func NewGenerateRunner(
 	options *config.Config,
-	extractor *extract.Extractor,
+	extractor ports.Extractor,
 	promptBuilder domain.PromptBuilder,
 	aiClient gemini.Generator,
 	reader remoteio.InputReader,

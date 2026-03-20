@@ -6,7 +6,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/shouni/go-http-kit/pkg/httpkit"
+	"github.com/shouni/go-http-kit/httpkit"
 
 	"prototypus-ai-doc-go/internal/app"
 	"prototypus-ai-doc-go/internal/config"
