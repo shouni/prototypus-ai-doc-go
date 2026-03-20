@@ -132,11 +132,7 @@ paidgo generate [flags]
 
 ---
 
-### ⚖️ クレジット表記 (Credits)
-
-* **VOICEVOX**: [https://voicevox.hiroshiba.jp/](https://voicevox.hiroshiba.jp/)
-* **デフォルトキャラクター**: VOICEVOX:ずんだもん、VOICEVOX:四国めたん
-
 ### 📜 ライセンス (License)
 
-このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
+* デフォルトキャラクター: VOICEVOX:ずんだもん、VOICEVOX:四国めたん
+* このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。

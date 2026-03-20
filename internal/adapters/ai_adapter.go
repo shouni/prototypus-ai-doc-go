@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/shouni/go-gemini-client/pkg/gemini"
+	"github.com/shouni/go-gemini-client/gemini"
 
 	"prototypus-ai-doc-go/internal/config"
 )
